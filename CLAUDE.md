@@ -57,7 +57,7 @@
 - **IPC:** nodejs-mobile JNI bridge + localhost HTTP
 - **Database:** SQL.js (WASM-compiled SQLite) — no native bindings needed
 - **Build:** Gradle (Kotlin DSL)
-- **Distribution:** Solana dApp Store APK (primary), Google Play AAB (secondary), direct APK sideload (fallback)
+- **Distribution:** Unified Application ID (`com.seekerclaw.app`) for all flavors — Solana dApp Store APK (primary), Google Play AAB (secondary), direct APK sideload (fallback).
 
 ## Project Structure
 

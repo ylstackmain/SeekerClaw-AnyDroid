@@ -399,19 +399,6 @@ private fun MarketplaceTeaserCard(shape: RoundedCornerShape, onClick: () -> Unit
                     color = SeekerClawColors.TextPrimary,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = "COMING SOON",
-                    fontFamily = RethinkSans,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = SeekerClawColors.Primary,
-                    modifier = Modifier
-                        .background(
-                            SeekerClawColors.Primary.copy(alpha = 0.12f),
-                            RoundedCornerShape(4.dp),
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                )
             }
             Spacer(Modifier.height(6.dp))
             Text(

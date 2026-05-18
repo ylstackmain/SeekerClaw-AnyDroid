@@ -181,7 +181,7 @@ SeekerClaw is an Android app built for the Solana Seeker phone (also works on an
 - **Open-source ready** — MIT license, CONTRIBUTING.md, issue/PR templates, GitHub Actions CI + release workflows.
 - **Unified Release Pipeline** — Automates signed APK/AAB builds for both `main` branch and version tags.
 - **Community Signing** — No-secrets-required signing flow using a public community keystore (`app/community-release.jks`) as a fallback when private secrets are missing.
-- **Multiple Flavors** — `dappStore` (`.dapp`) and `googlePlay` (`.play`) flavors with distinct Application IDs to prevent package conflicts.
+- **Unified Application ID** — Both `dappStore` and `googlePlay` flavors use the same Application ID (`com.seekerclaw.app`) for consistency across distributions.
 - **Firebase Analytics** build-optional — build succeeds without google-services.json.
 
 ## Features — In Progress

@@ -9,7 +9,7 @@ import java.net.URL
 import java.net.URLEncoder
 
 object MarketplaceRepository {
-    private const val BASE_URL = "https://clawhub.ai/api/v1"
+    private const val BASE_URL = "https://api.clawhub.ai/v1"
 
     suspend fun searchSkills(query: String): Result<List<MarketplaceSkill>> = withContext(Dispatchers.IO) {
         runCatching {
@@ -17,7 +17,7 @@ object MarketplaceRepository {
                 "$BASE_URL/skills?limit=50&sort=createdAt"
             } else {
                 val encodedQuery = URLEncoder.encode(query, "UTF-8")
-                "$BASE_URL/search?q=$encodedQuery"
+                "$BASE_URL/skills?q=$encodedQuery"
             }
             val (status, body) = httpGet(url)
             if (status !in 200..299) {

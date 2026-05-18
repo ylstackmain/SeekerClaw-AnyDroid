@@ -126,14 +126,12 @@ android {
     productFlavors {
         create("dappStore") {
             dimension = "distribution"
-            applicationIdSuffix = ".dapp"
             buildConfigField("String", "DISTRIBUTION", "\"dappStore\"")
             buildConfigField("String", "STORE_NAME", "\"Solana dApp Store\"")
             signingConfig = signingConfigs.getByName("dappStore")
         }
         create("googlePlay") {
             dimension = "distribution"
-            applicationIdSuffix = ".play"
             buildConfigField("String", "DISTRIBUTION", "\"googlePlay\"")
             buildConfigField("String", "STORE_NAME", "\"Google Play\"")
             signingConfig = signingConfigs.getByName("googlePlay")
