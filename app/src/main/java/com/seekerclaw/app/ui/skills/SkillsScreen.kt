@@ -131,53 +131,31 @@ private suspend fun createSkillTemplate(context: android.content.Context): Boole
     try {
         val workspaceDir = File(context.filesDir, "workspace")
         val skillsDir = File(workspaceDir, "skills").apply { mkdirs() }
-        val name = "my-custom-skill"
-        val skillDir = File(skillsDir, name).apply { mkdirs() }
+        val skillDir = File(skillsDir, "my-custom-skill").apply { mkdirs() }
         val skillFile = File(skillDir, "SKILL.md")
         if (skillFile.exists()) return@withContext(false)
         
-        val template = "---
-" +
-            "name: my-custom-skill
-" +
-            "description: "A custom skill - describe what it does here"
-" +
-            "version: "1.0.0"
-" +
-            "emoji: "🔧"
-" +
-            "triggers:
-" +
-            "  - keyword1
-" +
-            "  - keyword2
-" +
-            "allowed-tools:
-" +
-            "  - web_fetch
-" +
-            "  - read
-" +
-            "  - write
-" +
-            "---
-" +
-            "
-" +
-            "# My Custom Skill
-" +
-            "
-" +
-            "Use this section to give the AI detailed instructions for your skill.
-" +
-            "
-" +
-            "## Behavior
-" +
-            "
-" +
-            "Describe what the skill should do when triggered...
-"
+        val template = "---" + System.lineSeparator() +
+            "name: my-custom-skill" + System.lineSeparator() +
+            "description: "A custom skill - describe what it does here"" + System.lineSeparator() +
+            "version: "1.0.0"" + System.lineSeparator() +
+            "emoji: "\uD83D\uDD27"" + System.lineSeparator() +
+            "triggers:" + System.lineSeparator() +
+            "  - keyword1" + System.lineSeparator() +
+            "  - keyword2" + System.lineSeparator() +
+            "allowed-tools:" + System.lineSeparator() +
+            "  - web_fetch" + System.lineSeparator() +
+            "  - read" + System.lineSeparator() +
+            "  - write" + System.lineSeparator() +
+            "---" + System.lineSeparator() +
+            System.lineSeparator() +
+            "# My Custom Skill" + System.lineSeparator() +
+            System.lineSeparator() +
+            "Use this section to give the AI detailed instructions for your skill." + System.lineSeparator() +
+            System.lineSeparator() +
+            "## Behavior" + System.lineSeparator() +
+            System.lineSeparator() +
+            "Describe what the skill should do when triggered..."
         skillFile.writeText(template)
         true
     } catch (e: Exception) {
@@ -185,30 +163,28 @@ private suspend fun createSkillTemplate(context: android.content.Context): Boole
     }
 }
 
-private suspend fun installSkillFromPaste(context: android.content.Context, markdown: String): Result<String> = withContext(Dispatchers.IO) {
-    runCatching {
+private suspend fun installSkillFromPaste(context: android.content.Context, markdown: String): String? = withContext(Dispatchers.IO) {
+    try {
         val content = markdown.trim()
         if (!content.startsWith("---")) {
-            throw IllegalArgumentException("Content must start with YAML frontmatter (---)")
+            return@withContext null
         }
         
         val endIdx = content.indexOf("---", 3)
-        if (endIdx < 0) throw IllegalArgumentException("Invalid frontmatter: missing closing ---")
+        if (endIdx < 0) return@withContext null
         val frontmatter = content.substring(3, endIdx)
         
         val nameLine = frontmatter.lines().firstOrNull { it.trim().startsWith("name:") }
-            ?: throw IllegalArgumentException("Missing 'name' field in frontmatter")
-        val name = nameLine.substringAfter(":").trim().trim('"', ''').trim()
-            .takeIf { it.isNotEmpty() }
-            ?: throw IllegalArgumentException("Skill name cannot be empty")
+            ?: return@withContext null
+        val name = nameLine.substringAfter(":").replace("\"", "").replace("'", "").trim()
+        if (name.isEmpty()) return@withContext null
         
         val descLine = frontmatter.lines().firstOrNull { it.trim().startsWith("description:") }
-        if (descLine == null) throw IllegalArgumentException("Missing 'description' field in frontmatter")
+        if (descLine == null) return@withContext null
         
         val cleanName = name.lowercase().replace(Regex("[^a-z0-9_-]"), "-")
             .replace(Regex("-+"), "-").trim('-')
-            .takeIf { it.isNotEmpty() }
-            ?: throw IllegalArgumentException("Invalid skill name: " + name)
+        if (cleanName.isEmpty()) return@withContext null
         
         val workspaceDir = File(context.filesDir, "workspace")
         val skillsDir = File(workspaceDir, "skills").apply { mkdirs() }
@@ -217,6 +193,8 @@ private suspend fun installSkillFromPaste(context: android.content.Context, mark
         
         skillFile.writeText(content)
         name
+    } catch (e: Exception) {
+        null
     }
 }
 
@@ -446,9 +424,156 @@ private fun SkillsListContent(
                     }
                     Spacer(Modifier.height(16.dp))
                 }
+            }
+        }
 
-        }
-        }
+    // ==================== Create Skill Dialog ====================
+    if (showCreateSkillDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateSkillDialog = false },
+            title = {
+                Text(
+                    "Create Skill Template",
+                    fontFamily = RethinkSans,
+                    fontWeight = FontWeight.Bold,
+                    color = SeekerClawColors.TextPrimary,
+                )
+            },
+            text = {
+                Text(
+                    "This will create a new SKILL.md template in your skills directory. You can then edit it to add your own functionality.",
+                    fontFamily = RethinkSans,
+                    fontSize = 13.sp,
+                    color = SeekerClawColors.TextSecondary,
+                    lineHeight = 20.sp,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        val success = withContext(Dispatchers.IO) {
+                            createSkillTemplate(context)
+                        }
+                        if (success) {
+                            reloadTrigger++
+                            Toast.makeText(context, "Skill template created", Toast.LENGTH_SHORT).show()
+                            Analytics.featureUsed("skill_template_created")
+                        } else {
+                            Toast.makeText(context, "Failed to create skill template", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    showCreateSkillDialog = false
+                }) {
+                    Text(
+                        "Create",
+                        fontFamily = RethinkSans,
+                        fontWeight = FontWeight.Bold,
+                        color = SeekerClawColors.Primary,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateSkillDialog = false }) {
+                    Text(
+                        "Cancel",
+                        fontFamily = RethinkSans,
+                        color = SeekerClawColors.TextDim,
+                    )
+                }
+            },
+            containerColor = SeekerClawColors.Surface,
+            shape = shape,
+        )
+    }
+
+    // ==================== Import Skill Paste Dialog ====================
+    if (showImportSkillPasteDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportSkillPasteDialog = false },
+            title = {
+                Text(
+                    "Import Skill from Markdown",
+                    fontFamily = RethinkSans,
+                    fontWeight = FontWeight.Bold,
+                    color = SeekerClawColors.TextPrimary,
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        "Paste the raw SKILL.md markdown content below:",
+                        fontFamily = RethinkSans,
+                        fontSize = 13.sp,
+                        color = SeekerClawColors.TextDim,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                    OutlinedTextField(
+                        value = importPasteContent,
+                        onValueChange = { importPasteContent = it },
+                        label = { Text("Skill markdown", fontFamily = RethinkSans, fontSize = 12.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 6,
+                        maxLines = 12,
+                        textStyle = TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            color = SeekerClawColors.TextPrimary,
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = SeekerClawColors.Primary,
+                            unfocusedBorderColor = SeekerClawColors.TextDim.copy(alpha = 0.3f),
+                            cursorColor = SeekerClawColors.Primary,
+                        ),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val pasteContent = importPasteContent.trim()
+                        if (pasteContent.isNotEmpty()) {
+                            scope.launch {
+                                val name = withContext(Dispatchers.IO) {
+                                    installSkillFromPaste(context, pasteContent)
+                                }
+                                if (name != null) {
+                                    reloadTrigger++
+                                    importPasteContent = ""
+                                    showImportSkillPasteDialog = false
+                                    Toast.makeText(context, "Skill installed: " + name, Toast.LENGTH_SHORT).show()
+                                    Analytics.featureUsed("skill_imported_paste")
+                                } else {
+                                    Toast.makeText(context, "Import failed: invalid skill format", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } else {
+                            Toast.makeText(context, "Paste some markdown content first", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                ) {
+                    Text(
+                        "Install",
+                        fontFamily = RethinkSans,
+                        fontWeight = FontWeight.Bold,
+                        color = SeekerClawColors.Primary,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImportSkillPasteDialog = false
+                    importPasteContent = ""
+                }) {
+                    Text(
+                        "Cancel",
+                        fontFamily = RethinkSans,
+                        color = SeekerClawColors.TextDim,
+                    )
+                }
+            },
+            containerColor = SeekerClawColors.Surface,
+            shape = shape,
+        )
     }
 }
 
