@@ -1,6 +1,7 @@
 package com.seekerclaw.app.ui.skills
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -40,6 +41,7 @@ fun MarketplaceScreen(onBack: () -> Unit) {
     var skills by remember { mutableStateOf<List<MarketplaceSkill>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var selectedSkill by remember { mutableStateOf<MarketplaceSkill?>(null) }
     val shape = remember { RoundedCornerShape(SeekerClawColors.CornerRadius) }
 
     LaunchedEffect(searchQuery) {
@@ -64,6 +66,34 @@ fun MarketplaceScreen(onBack: () -> Unit) {
                 error = it.message
             }
         }
+    }
+
+    val skill = selectedSkill
+    if (skill != null) {
+        BackHandler { selectedSkill = null }
+        MarketplaceDetailScreen(
+            skill = skill,
+            onBack = { selectedSkill = null },
+            onInstall = {
+                scope.launch {
+                    val result = MarketplaceRepository.downloadSkill(skill.downloadUrl)
+                    result.onSuccess { content ->
+                        val success = withContext(Dispatchers.IO) {
+                            installSkill(context, skill.name, content)
+                        }
+                        if (success) {
+                            Toast.makeText(context, "Skill installed: ${skill.name}", Toast.LENGTH_SHORT).show()
+                            Analytics.featureUsed("skill_installed_marketplace")
+                        } else {
+                            Toast.makeText(context, "Failed to install skill", Toast.LENGTH_SHORT).show()
+                        }
+                    }.onFailure {
+                        Toast.makeText(context, "Failed to download skill: ${it.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        )
+        return
     }
 
     Column(
@@ -132,6 +162,7 @@ fun MarketplaceScreen(onBack: () -> Unit) {
                     MarketplaceSkillCard(
                         skill = skill,
                         shape = shape,
+                        onClick = { selectedSkill = skill },
                         onInstall = {
                             scope.launch {
                                 val result = MarketplaceRepository.downloadSkill(skill.downloadUrl)
@@ -233,6 +264,7 @@ private fun MarketplaceSearchField(
 private fun MarketplaceSkillCard(
     skill: MarketplaceSkill,
     shape: RoundedCornerShape,
+    onClick: () -> Unit,
     onInstall: () -> Unit,
 ) {
     Row(
@@ -240,22 +272,11 @@ private fun MarketplaceSkillCard(
             .fillMaxWidth()
             .background(SeekerClawColors.Surface, shape)
             .cornerGlowBorder()
+            .clickable(onClickLabel = "View ${skill.name}", onClick = onClick)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Simple avatar for marketplace skills
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(shape)
-                .background(SeekerClawColors.SurfaceHighlight),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = skill.emoji.ifEmpty { "🧩" },
-                fontSize = 22.sp,
-            )
-        }
+        SkillAvatar(skill = skill, size = 44, shape = shape)
         
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -293,7 +314,7 @@ private fun MarketplaceSkillCard(
                     fontFamily = RethinkSans,
                     fontSize = 13.sp,
                     color = SeekerClawColors.TextDim,
-                    maxLines = 2,
+                    maxLines = 1,
                 )
             }
         }

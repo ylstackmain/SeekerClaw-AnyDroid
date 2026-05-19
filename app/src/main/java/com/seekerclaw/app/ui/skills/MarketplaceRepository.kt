@@ -94,7 +94,7 @@ object MarketplaceRepository {
             List(arr.length()) { arr.getString(it) }
         } ?: emptyList()
         return MarketplaceSkill(
-            id = obj.getString("slug"),
+            id = obj.optString("slug", obj.optString("id", "")),
             name = name,
             description = description,
             version = version,

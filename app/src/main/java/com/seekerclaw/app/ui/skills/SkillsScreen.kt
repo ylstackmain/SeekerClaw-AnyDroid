@@ -45,6 +45,10 @@ import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
 import com.seekerclaw.app.config.ConfigManager
 import com.seekerclaw.app.config.EnvVarRegistry
@@ -108,6 +112,7 @@ fun SkillsScreen(
             navController = navController,
             onSkillClick = { selectedSkill = it },
             onNavigateToMarketplace = onNavigateToMarketplace,
+            scope = scope,
         )
     }
 }
@@ -118,15 +123,38 @@ private fun SkillsListContent(
     navController: NavHostController,
     onSkillClick: (SkillInfo) -> Unit,
     onNavigateToMarketplace: () -> Unit,
+    scope: CoroutineScope,
 ) {
     val context = LocalContext.current
     val envKeys by EnvVarRegistry.keys.collectAsState()
-    LaunchedEffect(Unit) { EnvVarRegistry.refreshFromConfig(context) }
     var skills by remember { mutableStateOf<List<SkillInfo>>(emptyList()) }
+    
+    suspend fun loadSkills() {
+        val loaded = withContext(Dispatchers.IO) {
+            val defaultNames = ConfigManager.getDefaultSkillNames(context)
+            val defaultHashes = ConfigManager.getDefaultSkillHashes(context)
+            SkillsRepository.loadSkills(workspaceDir, defaultNames, defaultHashes)
+        }
+        skills = loaded
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch {
+                    EnvVarRegistry.refreshFromConfig(context)
+                    loadSkills()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     var searchQuery by remember { mutableStateOf("") }
     var reloadTrigger by remember { mutableStateOf(0) }
     val shape = remember { RoundedCornerShape(SeekerClawColors.CornerRadius) }
-    val scope = rememberCoroutineScope()
 
     // Bulk export launcher
     val bulkExportLauncher = rememberLauncherForActivityResult(
@@ -169,15 +197,6 @@ private fun SkillsListContent(
                 }
             }
         }
-    }
-
-    suspend fun loadSkills() {
-        val loaded = withContext(Dispatchers.IO) {
-            val defaultNames = ConfigManager.getDefaultSkillNames(context)
-            val defaultHashes = ConfigManager.getDefaultSkillHashes(context)
-            SkillsRepository.loadSkills(workspaceDir, defaultNames, defaultHashes)
-        }
-        skills = loaded
     }
 
     LaunchedEffect(reloadTrigger) { loadSkills() }
@@ -408,72 +427,6 @@ private fun MarketplaceTeaserCard(shape: RoundedCornerShape, onClick: () -> Unit
                 color = SeekerClawColors.TextDim,
             )
         }
-    }
-}
-
-@Composable
-fun SkillAvatar(
-    skill: SkillInfo,
-    size: Int = 44,
-    shape: RoundedCornerShape = RoundedCornerShape(SeekerClawColors.CornerRadius),
-    emojiFontSize: Int = 22,
-) {
-    if (skill.imageUrl.isNotEmpty()) {
-        SubcomposeAsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(skill.imageUrl)
-                .crossfade(true)
-                .build(),
-            contentDescription = skill.name,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(size.dp)
-                .clip(shape),
-            loading = {
-                EmojiAvatar(
-                    emoji = skill.emoji,
-                    size = size,
-                    shape = shape,
-                    emojiFontSize = emojiFontSize,
-                )
-            },
-            error = {
-                EmojiAvatar(
-                    emoji = skill.emoji,
-                    size = size,
-                    shape = shape,
-                    emojiFontSize = emojiFontSize,
-                )
-            },
-        )
-    } else {
-        EmojiAvatar(
-            emoji = skill.emoji,
-            size = size,
-            shape = shape,
-            emojiFontSize = emojiFontSize,
-        )
-    }
-}
-
-@Composable
-private fun EmojiAvatar(
-    emoji: String,
-    size: Int,
-    shape: RoundedCornerShape,
-    emojiFontSize: Int,
-) {
-    Box(
-        modifier = Modifier
-            .size(size.dp)
-            .clip(shape)
-            .background(SeekerClawColors.SurfaceHighlight),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = emoji.ifEmpty { "⚡" },
-            fontSize = emojiFontSize.sp,
-        )
     }
 }
 
