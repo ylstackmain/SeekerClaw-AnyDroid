@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,15 +30,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.seekerclaw.app.ui.components.CardSurface
 import com.seekerclaw.app.ui.theme.RethinkSans
 import com.seekerclaw.app.ui.theme.SeekerClawColors
 
 @Composable
-fun SkillDetailScreen(
-    skill: SkillInfo,
+fun MarketplaceDetailScreen(
+    skill: MarketplaceSkill,
     onBack: () -> Unit,
-    onExport: (() -> Unit)? = null,
+    onInstall: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -51,25 +54,13 @@ fun SkillDetailScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = "← Skills",
+                text = "← Marketplace",
                 fontFamily = RethinkSans,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = SeekerClawColors.Primary,
-                modifier = Modifier.clickable(onClickLabel = "Back to skills list", onClick = onBack),
+                modifier = Modifier.clickable(onClickLabel = "Back to marketplace", onClick = onBack),
             )
-            if (onExport != null) {
-                Text(
-                    text = "Export",
-                    fontFamily = RethinkSans,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = SeekerClawColors.Accent,
-                    modifier = Modifier
-                        .clickable(onClickLabel = "Export skill", onClick = onExport)
-                        .padding(4.dp),
-                )
-            }
         }
 
         HorizontalDivider(
@@ -85,7 +76,7 @@ fun SkillDetailScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SkillAvatar(skill = skill, size = 56, emojiFontSize = 32)
                 Spacer(Modifier.width(16.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = skill.name,
                         fontFamily = RethinkSans,
@@ -93,26 +84,40 @@ fun SkillDetailScreen(
                         fontWeight = FontWeight.Bold,
                         color = SeekerClawColors.TextPrimary,
                     )
-                    if (skill.version.isNotEmpty()) {
-                        Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "v${skill.version.removePrefix("v").removePrefix("V")}",
+                            text = "v${skill.version}",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 12.sp,
                             color = SeekerClawColors.TextDim,
                         )
+                        if (skill.author.isNotEmpty()) {
+                            Text(
+                                text = " • ",
+                                color = SeekerClawColors.TextDim,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = "by ${skill.author}",
+                                fontFamily = RethinkSans,
+                                fontSize = 12.sp,
+                                color = SeekerClawColors.Accent,
+                            )
+                        }
                     }
                 }
-            }
-
-            // Type
-            InfoSection(label = "TYPE") {
-                Text(
-                    text = if (skill.isDefault) "Default (bundled)" else "Added by user",
-                    fontFamily = RethinkSans,
-                    fontSize = 14.sp,
-                    color = SeekerClawColors.TextPrimary,
-                )
+                
+                Button(
+                    onClick = onInstall,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SeekerClawColors.Primary.copy(alpha = 0.15f),
+                        contentColor = SeekerClawColors.Primary,
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Text("GET", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
             // Description
@@ -129,15 +134,8 @@ fun SkillDetailScreen(
             }
 
             // Triggers
-            InfoSection(label = "TRIGGERS") {
-                if (skill.triggers.isEmpty()) {
-                    Text(
-                        text = "Semantic — AI picks this skill based on description",
-                        fontFamily = RethinkSans,
-                        fontSize = 13.sp,
-                        color = SeekerClawColors.TextDim,
-                    )
-                } else {
+            if (skill.triggers.isNotEmpty()) {
+                InfoSection(label = "TRIGGERS") {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         skill.triggers.forEach { trigger ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -160,41 +158,38 @@ fun SkillDetailScreen(
                 }
             }
 
-            // Diagnostics
-            if (skill.warnings.isNotEmpty()) {
-                InfoSection(label = "DIAGNOSTICS") {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        skill.warnings.forEach { warning ->
-                            Row(verticalAlignment = Alignment.Top) {
-                                Text(
-                                    text = "⚠",
-                                    fontSize = 13.sp,
-                                    color = SeekerClawColors.Warning,
+            // Requirements
+            if (skill.requiresEnv.isNotEmpty()) {
+                InfoSection(label = "REQUIREMENTS") {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "This skill requires the following environment variables:",
+                            fontFamily = RethinkSans,
+                            fontSize = 13.sp,
+                            color = SeekerClawColors.TextDim,
+                        )
+                        skill.requiresEnv.forEach { env ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .clip(CircleShape)
+                                        .background(SeekerClawColors.TextDim),
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = warning,
-                                    fontFamily = RethinkSans,
+                                    text = env,
+                                    fontFamily = FontFamily.Monospace,
                                     fontSize = 13.sp,
-                                    color = SeekerClawColors.Warning,
-                                    lineHeight = 18.sp,
+                                    color = SeekerClawColors.TextPrimary,
                                 )
                             }
                         }
                     }
                 }
             }
-
-            // File path
-            InfoSection(label = "FILE") {
-                Text(
-                    text = skill.filePath,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    color = SeekerClawColors.TextDim,
-                    lineHeight = 18.sp,
-                )
-            }
+            
+            Spacer(Modifier.height(24.dp))
         }
     }
 }

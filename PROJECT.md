@@ -181,7 +181,7 @@ SeekerClaw is an Android app built for the Solana Seeker phone (also works on an
 - **Open-source ready** — MIT license, CONTRIBUTING.md, issue/PR templates, GitHub Actions CI + release workflows.
 - **Unified Release Pipeline** — Automates signed APK/AAB builds for both `main` branch and version tags.
 - **Community Signing** — No-secrets-required signing flow using a public community keystore (`app/community-release.jks`) as a fallback when private secrets are missing.
-- **Multiple Flavors** — `dappStore` (`.dapp`) and `googlePlay` (`.play`) flavors with distinct Application IDs to prevent package conflicts.
+- **Unified Application ID** — Both `dappStore` and `googlePlay` flavors use the same Application ID (`com.seekerclaw.app`) for consistency across distributions.
 - **Firebase Analytics** build-optional — build succeeds without google-services.json.
 
 ## Features — In Progress
@@ -285,7 +285,8 @@ User (Telegram/Discord) <--HTTPS/WSS--> Channel API <--polling/WS--> Node.js Gat
 
 | Date | Feature | PR |
 |------|---------|-----|
-| 2026-05-04 | Release: v1.10.0 — Env Vars, Extended Thinking on every provider, /model + /provider Telegram switches, live cross-process Settings, Activity Heatmap, BAT-525 graceful Stop. | #359, #360, #361 |
+| 2026-05-19 | Polish: Marketplace UI & detail views. Refactored SkillAvatar/InfoSection for reuse. Fixed search API parsing & unified package ID. | #362 |
+| 2026-05-17 | Release: v1.11.0 — Skill Marketplace, community skill sharing. | #361 |
 | 2026-05-02 | Docs: SAB-AUDIT-v24 — BAT-525 + BAT-504 + MAX_STEPS post-merge gap fix. | #357 |
 | 2026-05-02 | Fix: Flush Node state before user-initiated Stop (BAT-525). Bounded shutdown handshake over loopback persists pending session summaries + dirty SQL.js writes within ~1.5s before `killProcess()`. | #349 |
 | 2026-05-02 | Feat: Cross-provider reasoning hotfix (BAT-558, BAT-559). `/think` echo override fix + provider label cleanup across dashboard pills, Settings, and `displayNameForProvider`. | #356 |
