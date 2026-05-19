@@ -125,6 +125,7 @@ fun SettingsScreen(
     onNavigateToSearchConfig: () -> Unit = {},
     onNavigateToMcpConfig: () -> Unit = {},
     onNavigateToEnvVars: () -> Unit = {},
+    onNavigateToSkillSources: () -> Unit = {},
 ) {
     val context = LocalContext.current
     // Observe configVersion so UI refreshes when bridge saves owner ID (auto-detect)
@@ -519,6 +520,13 @@ fun SettingsScreen(
                     value = "$mcpServerCount server${if (mcpServerCount != 1) "s" else ""} configured",
                     onClick = onNavigateToMcpConfig,
                     info = SettingsHelpTexts.MCP_SERVERS,
+                    showDivider = true,
+                )
+                ConfigField(
+                    label = "Skill Sources",
+                    value = "Catalogs for marketplace",
+                    onClick = onNavigateToSkillSources,
+                    info = "Manage skill catalog URLs for the marketplace.",
                     showDivider = true,
                 )
                 ConfigField(

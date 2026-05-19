@@ -23,7 +23,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -116,6 +124,102 @@ fun SkillsScreen(
         )
     }
 }
+
+// ==================== Create / Import Dialogs & Helpers ====================
+
+private suspend fun createSkillTemplate(context: android.content.Context): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val workspaceDir = File(context.filesDir, "workspace")
+        val skillsDir = File(workspaceDir, "skills").apply { mkdirs() }
+        val name = "my-custom-skill"
+        val skillDir = File(skillsDir, name).apply { mkdirs() }
+        val skillFile = File(skillDir, "SKILL.md")
+        if (skillFile.exists()) return@withContext(false)
+        
+        val template = "---
+" +
+            "name: my-custom-skill
+" +
+            "description: "A custom skill - describe what it does here"
+" +
+            "version: "1.0.0"
+" +
+            "emoji: "🔧"
+" +
+            "triggers:
+" +
+            "  - keyword1
+" +
+            "  - keyword2
+" +
+            "allowed-tools:
+" +
+            "  - web_fetch
+" +
+            "  - read
+" +
+            "  - write
+" +
+            "---
+" +
+            "
+" +
+            "# My Custom Skill
+" +
+            "
+" +
+            "Use this section to give the AI detailed instructions for your skill.
+" +
+            "
+" +
+            "## Behavior
+" +
+            "
+" +
+            "Describe what the skill should do when triggered...
+"
+        skillFile.writeText(template)
+        true
+    } catch (e: Exception) {
+        false
+    }
+}
+
+private suspend fun installSkillFromPaste(context: android.content.Context, markdown: String): Result<String> = withContext(Dispatchers.IO) {
+    runCatching {
+        val content = markdown.trim()
+        if (!content.startsWith("---")) {
+            throw IllegalArgumentException("Content must start with YAML frontmatter (---)")
+        }
+        
+        val endIdx = content.indexOf("---", 3)
+        if (endIdx < 0) throw IllegalArgumentException("Invalid frontmatter: missing closing ---")
+        val frontmatter = content.substring(3, endIdx)
+        
+        val nameLine = frontmatter.lines().firstOrNull { it.trim().startsWith("name:") }
+            ?: throw IllegalArgumentException("Missing 'name' field in frontmatter")
+        val name = nameLine.substringAfter(":").trim().trim('"', ''').trim()
+            .takeIf { it.isNotEmpty() }
+            ?: throw IllegalArgumentException("Skill name cannot be empty")
+        
+        val descLine = frontmatter.lines().firstOrNull { it.trim().startsWith("description:") }
+        if (descLine == null) throw IllegalArgumentException("Missing 'description' field in frontmatter")
+        
+        val cleanName = name.lowercase().replace(Regex("[^a-z0-9_-]"), "-")
+            .replace(Regex("-+"), "-").trim('-')
+            .takeIf { it.isNotEmpty() }
+            ?: throw IllegalArgumentException("Invalid skill name: " + name)
+        
+        val workspaceDir = File(context.filesDir, "workspace")
+        val skillsDir = File(workspaceDir, "skills").apply { mkdirs() }
+        val skillDir = File(skillsDir, cleanName).apply { mkdirs() }
+        val skillFile = File(skillDir, "SKILL.md")
+        
+        skillFile.writeText(content)
+        name
+    }
+}
+
 
 @Composable
 private fun SkillsListContent(
@@ -213,6 +317,10 @@ private fun SkillsListContent(
     val addedSkills = remember(filtered) { filtered.filter { !it.isDefault } }
     val defaultSkills = remember(filtered) { filtered.filter { it.isDefault } }
 
+    var showCreateSkillDialog by remember { mutableStateOf(false) }
+    var showImportSkillPasteDialog by remember { mutableStateOf(false) }
+    var importPasteContent by remember { mutableStateOf("") }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -298,7 +406,48 @@ private fun SkillsListContent(
                         SkillCard(skill = skill, shape = shape, envKeys = envKeys, navController = navController, onClick = { onSkillClick(skill) })
                     }
                 }
-            }
+                    // Create & Import buttons
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = { showCreateSkillDialog = true },
+                            modifier = Modifier.weight(1f),
+                            shape = shape,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = SeekerClawColors.Primary,
+                            ),
+                        ) {
+                            Text(
+                                text = "+ Create Skill",
+                                fontFamily = RethinkSans,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { showImportSkillPasteDialog = true },
+                            modifier = Modifier.weight(1f),
+                            shape = shape,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = SeekerClawColors.Accent,
+                            ),
+                        ) {
+                            Text(
+                                text = "Paste Import",
+                                fontFamily = RethinkSans,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+
+        }
         }
     }
 }
