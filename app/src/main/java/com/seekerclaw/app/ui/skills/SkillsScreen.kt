@@ -23,15 +23,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
@@ -39,9 +30,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,17 +43,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -78,6 +65,79 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+
+// ==================== Create / Import Helpers ====================
+
+private suspend fun createSkillTemplate(context: android.content.Context): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val workspaceDir = File(context.filesDir, "workspace")
+        val skillsDir = File(workspaceDir, "skills").apply { mkdirs() }
+        val skillDir = File(skillsDir, "my-custom-skill").apply { mkdirs() }
+        val skillFile = File(skillDir, "SKILL.md")
+        if (skillFile.exists()) return@withContext(false)
+
+        val template = buildString {
+            appendLine("---")
+            appendLine("name: my-custom-skill")
+            appendLine("description: \"A custom skill - describe what it does here\"")
+            appendLine("version: \"1.0.0\"")
+            appendLine("emoji: \"🔧\"")
+            appendLine("triggers:")
+            appendLine("  - keyword1")
+            appendLine("  - keyword2")
+            appendLine("allowed-tools:")
+            appendLine("  - web_fetch")
+            appendLine("  - read")
+            appendLine("  - write")
+            appendLine("---")
+            appendLine("")
+            appendLine("# My Custom Skill")
+            appendLine("")
+            appendLine("Use this section to give the AI detailed instructions for your skill.")
+            appendLine("")
+            appendLine("## Behavior")
+            appendLine("")
+            append("Describe what the skill should do when triggered...")
+        }
+        skillFile.writeText(template)
+        true
+    } catch (e: Exception) {
+        false
+    }
+}
+
+private suspend fun installSkillFromPaste(context: android.content.Context, markdown: String): String? = withContext(Dispatchers.IO) {
+    try {
+        val content = markdown.trim()
+        if (!content.startsWith("---")) return@withContext null
+
+        val endIdx = content.indexOf("---", 3)
+        if (endIdx < 0) return@withContext null
+        val frontmatter = content.substring(3, endIdx)
+
+        val nameLine = frontmatter.lines().firstOrNull { it.trim().startsWith("name:") }
+            ?: return@withContext null
+        val name = nameLine.substringAfter(":").trim(' ', '"', '\'').trim()
+        if (name.isEmpty()) return@withContext null
+
+        val descLine = frontmatter.lines().firstOrNull { it.trim().startsWith("description:") }
+        if (descLine == null) return@withContext null
+
+        val cleanName = name.lowercase().replace(Regex("[^a-z0-9_-]"), "-")
+            .replace(Regex("-+"), "-").trim('-')
+        if (cleanName.isEmpty()) return@withContext null
+
+        val workspaceDir = File(context.filesDir, "workspace")
+        val skillsDir = File(workspaceDir, "skills").apply { mkdirs() }
+        val skillDir = File(skillsDir, cleanName).apply { mkdirs() }
+        val skillFile = File(skillDir, "SKILL.md")
+
+        skillFile.writeText(content)
+        name
+    } catch (e: Exception) {
+        null
+    }
+}
 
 @Composable
 fun SkillsScreen(
@@ -132,83 +192,6 @@ fun SkillsScreen(
         )
     }
 }
-
-// ==================== Create / Import Dialogs & Helpers ====================
-
-private suspend fun createSkillTemplate(context: android.content.Context): Boolean = withContext(Dispatchers.IO) {
-    try {
-        val workspaceDir = File(context.filesDir, "workspace")
-        val skillsDir = File(workspaceDir, "skills").apply { mkdirs() }
-        val skillDir = File(skillsDir, "my-custom-skill").apply { mkdirs() }
-        val skillFile = File(skillDir, "SKILL.md")
-        if (skillFile.exists()) return@withContext(false)
-        
-        val nl = System.lineSeparator()
-        val template = StringBuilder().apply {
-            append("---").append(nl)
-            append("name: my-custom-skill").append(nl)
-            append("description: "A custom skill - describe what it does here"").append(nl)
-            append("version: "1.0.0"").append(nl)
-            append("emoji: "\uD83D\uDD27"").append(nl)
-            append("triggers:").append(nl)
-            append("  - keyword1").append(nl)
-            append("  - keyword2").append(nl)
-            append("allowed-tools:").append(nl)
-            append("  - web_fetch").append(nl)
-            append("  - read").append(nl)
-            append("  - write").append(nl)
-            append("---").append(nl)
-            append(nl)
-            append("# My Custom Skill").append(nl)
-            append(nl)
-            append("Use this section to give the AI detailed instructions for your skill.").append(nl)
-            append(nl)
-            append("## Behavior").append(nl)
-            append(nl)
-            append("Describe what the skill should do when triggered...")
-        }.toString()
-        skillFile.writeText(template)
-        true
-    } catch (e: Exception) {
-        false
-    }
-}
-
-private suspend fun installSkillFromPaste(context: android.content.Context, markdown: String): String? = withContext(Dispatchers.IO) {
-    try {
-        val content = markdown.trim()
-        if (!content.startsWith("---")) {
-            return@withContext null
-        }
-        
-        val endIdx = content.indexOf("---", 3)
-        if (endIdx < 0) return@withContext null
-        val frontmatter = content.substring(3, endIdx)
-        
-        val nameLine = frontmatter.lines().firstOrNull { it.trim().startsWith("name:") }
-            ?: return@withContext null
-        val name = nameLine.substringAfter(":").replace("\"", "").replace("'", "").trim()
-        if (name.isEmpty()) return@withContext null
-        
-        val descLine = frontmatter.lines().firstOrNull { it.trim().startsWith("description:") }
-        if (descLine == null) return@withContext null
-        
-        val cleanName = name.lowercase().replace(Regex("[^a-z0-9_-]"), "-")
-            .replace(Regex("-+"), "-").trim('-')
-        if (cleanName.isEmpty()) return@withContext null
-        
-        val workspaceDir = File(context.filesDir, "workspace")
-        val skillsDir = File(workspaceDir, "skills").apply { mkdirs() }
-        val skillDir = File(skillsDir, cleanName).apply { mkdirs() }
-        val skillFile = File(skillDir, "SKILL.md")
-        
-        skillFile.writeText(content)
-        name
-    } catch (e: Exception) {
-        null
-    }
-}
-
 
 @Composable
 private fun SkillsListContent(
@@ -309,10 +292,6 @@ private fun SkillsListContent(
     var showCreateSkillDialog by remember { mutableStateOf(false) }
     var showImportSkillPasteDialog by remember { mutableStateOf(false) }
     var importPasteContent by remember { mutableStateOf("") }
-
-    var showCreateDialog by remember { mutableStateOf(false) }
-    var showPasteDialog by remember { mutableStateOf(false) }
-    var pasteContent by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
@@ -589,6 +568,7 @@ private fun SkillsListContent(
             containerColor = SeekerClawColors.Surface,
             shape = shape,
         )
+    }
     }
 }
 
@@ -879,129 +859,4 @@ private fun EmptySkillsState(isFiltered: Boolean) {
             color = SeekerClawColors.TextDim,
         )
     }
-
-
-
-    // Create Skill Dialog
-    if (showCreateDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateDialog = false },
-            title = { Text("Create Skill Template", fontFamily = RethinkSans, fontWeight = FontWeight.Bold, color = SeekerClawColors.TextPrimary) },
-            text = { Text("This will create a new SKILL.md template.", fontFamily = RethinkSans, fontSize = 13.sp, color = SeekerClawColors.TextSecondary) },
-            confirmButton = {
-                TextButton(onClick = {
-                    scope.launch {
-                        val ok = withContext(Dispatchers.IO) { createSkillTemplate(context) }
-                        if (ok) { reloadTrigger++; Toast.makeText(context, "Skill template created", Toast.LENGTH_SHORT).show() }
-                        else { Toast.makeText(context, "Failed", Toast.LENGTH_SHORT).show() }
-                    }
-                    showCreateDialog = false
-                }) { Text("Create", fontFamily = RethinkSans, fontWeight = FontWeight.Bold, color = SeekerClawColors.Primary) }
-            },
-            dismissButton = { TextButton(onClick = { showCreateDialog = false }) { Text("Cancel", fontFamily = RethinkSans, color = SeekerClawColors.TextDim) } },
-            containerColor = SeekerClawColors.Surface,
-            shape = shape,
-        )
-    }
-    if (showPasteDialog) {
-        AlertDialog(
-            onDismissRequest = { showPasteDialog = false },
-            title = { Text("Import Skill", fontFamily = RethinkSans, fontWeight = FontWeight.Bold, color = SeekerClawColors.TextPrimary) },
-            text = {
-                Column {
-                    Text("Paste SKILL.md content:", fontFamily = RethinkSans, fontSize = 13.sp, color = SeekerClawColors.TextDim)
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(value = pasteContent, onValueChange = { pasteContent = it }, modifier = Modifier.fillMaxWidth().height(150.dp), textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = SeekerClawColors.TextPrimary), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SeekerClawColors.Primary, unfocusedBorderColor = SeekerClawColors.TextDim.copy(alpha = 0.3f)))
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val text = pasteContent.trim()
-                    if (text.isNotEmpty()) {
-                        scope.launch {
-                            val name = withContext(Dispatchers.IO) { installSkillFromPaste(context, text) }
-                            if (name != null) { reloadTrigger++; pasteContent = ""; showPasteDialog = false; Toast.makeText(context, "Installed: " + name, Toast.LENGTH_SHORT).show() }
-                            else { Toast.makeText(context, "Invalid skill format", Toast.LENGTH_SHORT).show() }
-                        }
-                    }
-                }) { Text("Install", fontFamily = RethinkSans, fontWeight = FontWeight.Bold, color = SeekerClawColors.Primary) }
-            },
-            dismissButton = { TextButton(onClick = { showPasteDialog = false; pasteContent = "" }) { Text("Cancel", fontFamily = RethinkSans, color = SeekerClawColors.TextDim) } },
-            containerColor = SeekerClawColors.Surface,
-            shape = shape,
-        )
-    }
-}
-// ==================== Create / Import Helpers ====================
-
-private suspend fun createSkillTemplate(context: android.content.Context): Boolean = withContext(Dispatchers.IO) {
-    try {
-        val workspaceDir = File(context.filesDir, "workspace")
-        val skillsDir = File(workspaceDir, "skills").apply { mkdirs() }
-        val skillDir = File(skillsDir, "my-custom-skill").apply { mkdirs() }
-        val skillFile = File(skillDir, "SKILL.md")
-        if (skillFile.exists()) return@withContext(false)
-
-        val template = buildString {
-            appendLine("---")
-            appendLine("name: my-custom-skill")
-            appendLine("description: \"A custom skill - describe what it does here\"")
-            appendLine("version: \"1.0.0\"")
-            appendLine("emoji: \"🔧\"")
-            appendLine("triggers:")
-            appendLine("  - keyword1")
-            appendLine("  - keyword2")
-            appendLine("allowed-tools:")
-            appendLine("  - web_fetch")
-            appendLine("  - read")
-            appendLine("  - write")
-            appendLine("---")
-            appendLine("")
-            appendLine("# My Custom Skill")
-            appendLine("")
-            appendLine("Use this section to give the AI detailed instructions for your skill.")
-            appendLine("")
-            appendLine("## Behavior")
-            appendLine("")
-            append("Describe what the skill should do when triggered...")
-        }
-        skillFile.writeText(template)
-        true
-    } catch (e: Exception) {
-        false
-    }
-}
-
-private suspend fun installSkillFromPaste(context: android.content.Context, markdown: String): String? = withContext(Dispatchers.IO) {
-    try {
-        val content = markdown.trim()
-        if (!content.startsWith("---")) return@withContext null
-
-        val endIdx = content.indexOf("---", 3)
-        if (endIdx < 0) return@withContext null
-        val frontmatter = content.substring(3, endIdx)
-
-        val nameLine = frontmatter.lines().firstOrNull { it.trim().startsWith("name:") }
-            ?: return@withContext null
-        val name = nameLine.substringAfter(":").trim(' ', '"', ''').trim()
-        if (name.isEmpty()) return@withContext null
-
-        val descLine = frontmatter.lines().firstOrNull { it.trim().startsWith("description:") }
-        if (descLine == null) return@withContext null
-
-        val cleanName = name.lowercase().replace(Regex("[^a-z0-9_-]"), "-")
-            .replace(Regex("-+"), "-").trim('-')
-        if (cleanName.isEmpty()) return@withContext null
-
-        val workspaceDir = File(context.filesDir, "workspace")
-        val skillsDir = File(workspaceDir, "skills").apply { mkdirs() }
-        val skillDir = File(skillsDir, cleanName).apply { mkdirs() }
-        val skillFile = File(skillDir, "SKILL.md")
-
-        skillFile.writeText(content)
-        name
-    } catch (e: Exception) {
-        null
-    }
-}
 }
