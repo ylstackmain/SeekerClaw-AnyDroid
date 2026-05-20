@@ -197,7 +197,9 @@ function parseSkillFile(content, skillDir) {
         emoji: '',
         image: '',
         requires: { bins: [], env: [], config: [] },
-        dir: skillDir
+        dir: skillDir,
+        category: 'General',
+        enabled: true
     };
 
     let body = content;
@@ -225,6 +227,10 @@ function parseSkillFile(content, skillDir) {
                 }
             }
             if (frontmatter.emoji) skill.emoji = frontmatter.emoji;
+            if (frontmatter.category) skill.category = frontmatter.category;
+            if (frontmatter.enabled !== undefined) {
+                skill.enabled = String(frontmatter.enabled).toLowerCase() === 'true' || frontmatter.enabled === true;
+            }
             if (frontmatter.image && (frontmatter.image.startsWith('https://') || frontmatter.image.startsWith('http://'))) {
                 skill.image = frontmatter.image;
             }
@@ -474,7 +480,7 @@ function loadSkills() {
                         const content = fs.readFileSync(realSkillPath, 'utf8');
                         const skill = parseSkillFile(content, skillDir);
                         validateSkillFormat(skill, realSkillPath);
-                        if (skill.name) {
+                        if (skill.name && skill.enabled) {
                             skill.filePath = realSkillPath;
                             skills.push(skill);
                             dirCount++;
@@ -503,7 +509,7 @@ function loadSkills() {
                     const content = fs.readFileSync(realFile, 'utf8');
                     const skill = parseSkillFile(content, SKILLS_DIR);
                     validateSkillFormat(skill, realFile);
-                    if (skill.name) {
+                    if (skill.name && skill.enabled) {
                         skill.filePath = realFile;
                         skills.push(skill);
                         fileCount++;
