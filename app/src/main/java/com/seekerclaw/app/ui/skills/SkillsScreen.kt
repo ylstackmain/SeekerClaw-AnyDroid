@@ -139,6 +139,40 @@ private suspend fun installSkillFromPaste(context: android.content.Context, mark
     }
 }
 
+private fun toggleSkillEnabled(filePath: String, enabled: Boolean): Boolean {
+    return try {
+        val file = File(filePath)
+        if (!file.exists()) return false
+        val content = file.readText()
+        if (!content.startsWith("---")) {
+            // No frontmatter? We can't safely add it without possibly corrupting
+            // legacy format. SeekerClaw skills should have frontmatter.
+            return false
+        }
+        val endIdx = content.indexOf("---", 3)
+        if (endIdx < 0) return false
+        val frontmatter = content.substring(3, endIdx)
+        val lines = frontmatter.lines().toMutableList()
+
+        val enabledLineIdx = lines.indexOfFirst { it.trim().startsWith("enabled:") }
+        if (enabledLineIdx >= 0) {
+            val line = lines[enabledLineIdx]
+            val indent = line.takeWhile { it.isWhitespace() }
+            lines[enabledLineIdx] = "${indent}enabled: $enabled"
+        } else {
+            // Add it before the end of frontmatter
+            lines.add("enabled: $enabled")
+        }
+
+        val newFrontmatter = lines.joinToString("\n")
+        val newContent = "---" + newFrontmatter + "---" + content.substring(endIdx + 3)
+        file.writeText(newContent)
+        true
+    } catch (e: Exception) {
+        false
+    }
+}
+
 @Composable
 fun SkillsScreen(
     navController: NavHostController,
@@ -286,8 +320,11 @@ private fun SkillsListContent(
         }
     }
 
-    val addedSkills = remember(filtered) { filtered.filter { !it.isDefault } }
-    val defaultSkills = remember(filtered) { filtered.filter { it.isDefault } }
+    val groupedSkills = remember(filtered) {
+        filtered.groupBy { it.category }
+            .mapValues { it.value.sortedBy { s -> s.name.lowercase() } }
+            .toSortedMap()
+    }
 
     var showCreateSkillDialog by remember { mutableStateOf(false) }
     var showImportSkillPasteDialog by remember { mutableStateOf(false) }
@@ -350,35 +387,44 @@ private fun SkillsListContent(
                     EmptySkillsState(isFiltered = searchQuery.isNotEmpty())
                 }
             } else {
-                // Added skills section
-                if (addedSkills.isNotEmpty()) {
+                groupedSkills.forEach { (category, skillsInCategory) ->
                     item {
                         SectionHeader(
-                            title = "Added (${addedSkills.size})",
-                            actionLabel = "Export All",
+                            title = "$category (${skillsInCategory.size})",
+                            actionLabel = if (category == "General" && filtered.any { !it.isDefault }) "Export All" else null,
                             onAction = {
-                                val timestamp = android.text.format.DateFormat.format(
-                                    "yyyyMMdd", java.util.Date()
-                                )
-                                bulkExportLauncher.launch("seekerclaw_skills_$timestamp.zip")
+                                if (category == "General") {
+                                    val timestamp = android.text.format.DateFormat.format(
+                                        "yyyyMMdd", java.util.Date()
+                                    )
+                                    bulkExportLauncher.launch("seekerclaw_skills_$timestamp.zip")
+                                }
                             },
                         )
                     }
-                    items(addedSkills, key = { it.filePath }) { skill ->
-                        SkillCard(skill = skill, shape = shape, envKeys = envKeys, navController = navController, onClick = { onSkillClick(skill) })
+                    items(skillsInCategory, key = { it.filePath }) { skill ->
+                        SkillCard(
+                            skill = skill,
+                            shape = shape,
+                            envKeys = envKeys,
+                            navController = navController,
+                            onClick = { onSkillClick(skill) },
+                            onToggleEnabled = { enabled ->
+                                scope.launch {
+                                    val success = withContext(Dispatchers.IO) {
+                                        toggleSkillEnabled(skill.filePath, enabled)
+                                    }
+                                    if (success) {
+                                        reloadTrigger++
+                                    } else {
+                                        Toast.makeText(context, "Failed to update skill", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        )
                     }
                 }
-
-                // Default skills section
-                if (defaultSkills.isNotEmpty()) {
-                    item {
-                        SectionHeader(title = "Default (${defaultSkills.size})")
-                    }
-                    items(defaultSkills, key = { it.filePath }) { skill ->
-                        SkillCard(skill = skill, shape = shape, envKeys = envKeys, navController = navController, onClick = { onSkillClick(skill) })
-                    }
-                }
-                    // Create & Import buttons
+                // Create & Import buttons
                 item {
                     Spacer(Modifier.height(8.dp))
                     Row(
@@ -706,6 +752,7 @@ private fun SkillCard(
     envKeys: Set<String>,
     navController: NavHostController,
     onClick: () -> Unit,
+    onToggleEnabled: (Boolean) -> Unit,
 ) {
     val missingEnv = skill.requiresEnv.filterNot { envKeys.contains(it) }
     val hasMissingEnv = missingEnv.isNotEmpty()
@@ -731,7 +778,7 @@ private fun SkillCard(
                     fontFamily = RethinkSans,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
-                    color = SeekerClawColors.TextPrimary,
+                    color = if (skill.isEnabled) SeekerClawColors.TextPrimary else SeekerClawColors.TextDim,
                     modifier = Modifier.weight(1f),
                 )
                 if (skill.warnings.isNotEmpty()) {
@@ -751,6 +798,18 @@ private fun SkillCard(
                         color = SeekerClawColors.TextDim,
                     )
                 }
+                Spacer(Modifier.width(12.dp))
+                androidx.compose.material3.Switch(
+                    checked = skill.isEnabled,
+                    onCheckedChange = onToggleEnabled,
+                    colors = androidx.compose.material3.SwitchDefaults.colors(
+                        checkedThumbColor = SeekerClawColors.Primary,
+                        checkedTrackColor = SeekerClawColors.Primary.copy(alpha = 0.3f),
+                        uncheckedThumbColor = SeekerClawColors.TextDim,
+                        uncheckedTrackColor = SeekerClawColors.SurfaceHighlight,
+                        uncheckedBorderColor = SeekerClawColors.TextDim.copy(alpha = 0.3f),
+                    )
+                )
             }
             if (skill.description.isNotEmpty()) {
                 Spacer(Modifier.height(3.dp))

@@ -77,6 +77,12 @@ object SkillsRepository {
             ?: run { Log.w(TAG, "Skipping skill '$filePath': no name found"); return null }
         val description = (fm["description"] as? String)?.trim() ?: ""
         val version = (fm["version"] as? String)?.trim() ?: ""
+        val category = (fm["category"] as? String)?.trim() ?: "General"
+        val isEnabled = when (val e = fm["enabled"]) {
+            is Boolean -> e
+            is String -> e.lowercase() == "true"
+            else -> true
+        }
         val emoji = (fm["emoji"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
             ?: extractFrontmatterLine(content, "emoji")
         val imageUrl = (fm["image"] as? String)?.trim()?.takeIf {
@@ -104,6 +110,8 @@ object SkillsRepository {
             warnings = warnings,
             imageUrl = imageUrl,
             requiresEnv = requiresEnv,
+            category = category,
+            isEnabled = isEnabled,
         )
     }
 
@@ -237,6 +245,8 @@ object SkillsRepository {
                         .filter { it.isNotEmpty() }
                 }
                 rawValue.startsWith('{') -> { /* skip JSON objects */ }
+                rawValue.lowercase() == "true" -> result[key] = true
+                rawValue.lowercase() == "false" -> result[key] = false
                 else -> result[key] = rawValue.removeSurrounding("\"").removeSurrounding("'")
             }
             i++
