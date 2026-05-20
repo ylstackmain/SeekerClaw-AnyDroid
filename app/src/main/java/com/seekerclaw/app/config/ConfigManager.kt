@@ -95,6 +95,15 @@ data class McpServerConfig(
     val rateLimit: Int = 10,
 )
 
+data class SkillSource(
+    val name: String,
+    val url: String,
+    val enabled: Boolean = true,
+) {
+    /** Sanitized ID derived from name for dedup/file use. */
+    val id: String get() = name.lowercase().replace(Regex("[^a-z0-9_-]"), "-")
+}
+
 object ConfigManager {
     /** Incremented on every saveConfig(); observe in `remember(configVersion)`.
      *
@@ -221,6 +230,7 @@ object ConfigManager {
     private const val KEY_WALLET_LABEL = "wallet_label"
     private const val KEY_MCP_SERVERS_ENC = "mcp_servers_enc"
     private const val KEY_ENV_VARS_ENC = "env_vars_enc"
+    private const val KEY_SKILL_SOURCES_ENC = "skill_sources_enc"
     private const val KEY_HEARTBEAT_INTERVAL = "heartbeat_interval"
     private const val KEY_MAX_STEPS_PER_TURN = "max_steps_per_turn"
     private const val KEY_PROVIDER = "provider"
@@ -1680,6 +1690,66 @@ object ConfigManager {
         KeystoreHelper.deleteKey()
         bumpConfigVersionOnMain()
     }
+
+
+    // ==================== Skill Sources ====================
+
+    /**
+     * Persist the list of skill catalog sources to SharedPreferences as JSON.
+     * Includes a default ClawHub source if the list is empty on first save.
+     */
+    fun saveSkillSources(context: Context, sources: List<SkillSource>) {
+        val json = JSONArray().apply {
+            for (s in sources) {
+                put(JSONObject().apply {
+                    put("name", s.name)
+                    put("url", s.url)
+                    put("enabled", s.enabled)
+                })
+            }
+        }.toString()
+        val enc = KeystoreHelper.encrypt(json)
+        prefs(context).edit()
+            .putString(KEY_SKILL_SOURCES_ENC, Base64.encodeToString(enc, Base64.NO_WRAP))
+            .apply()
+        bumpConfigVersionOnMain()
+    }
+
+    /**
+     * Load the list of skill catalog sources from SharedPreferences.
+     * Returns a default list with ClawHub if none are persisted yet.
+     */
+    fun loadSkillSources(context: Context): List<SkillSource> {
+        return try {
+            val enc = prefs(context).getString(KEY_SKILL_SOURCES_ENC, null) ?: return defaultSkillSources()
+            val json = KeystoreHelper.decrypt(Base64.decode(enc, Base64.NO_WRAP))
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                SkillSource(
+                    name = obj.getString("name"),
+                    url = obj.getString("url"),
+                    enabled = obj.optBoolean("enabled", true),
+                )
+            }.ifEmpty { defaultSkillSources() }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to load skill sources", e)
+            LogCollector.append("[Config] Failed to load skill sources: ${e.javaClass.simpleName}", LogLevel.WARN)
+            defaultSkillSources()
+        }
+    }
+
+    /**
+     * Default skill sources list (ClawHub as the sole default catalog).
+     */
+    fun defaultSkillSources(): List<SkillSource> = listOf(
+        SkillSource(
+            name = "ClawHub",
+            url = "https://api.clawhub.ai/v1",
+            enabled = true,
+        ),
+    )
+
 
     fun clearOpenAIOAuth(context: Context) {
         prefs(context).edit()

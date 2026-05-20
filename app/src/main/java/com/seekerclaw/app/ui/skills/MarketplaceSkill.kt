@@ -14,4 +14,5 @@ data class MarketplaceSkill(
     val downloadUrl: String = "",
     val triggers: List<String> = emptyList(),
     val requiresEnv: List<String> = emptyList(),
+    val source: String = "",
 )

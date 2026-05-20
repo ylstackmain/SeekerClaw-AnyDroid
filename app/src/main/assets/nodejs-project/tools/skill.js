@@ -58,7 +58,7 @@ const tools = [
     },
     {
         name: 'skill_marketplace_search',
-        description: 'Search ClawHub.ai for community skills. Returns a list of skills with their name, description, author, version, and download URL. Use this to help the user find and install new capabilities.',
+        description: 'Search configured skill catalogs (e.g., ClawHub) for community skills. Returns a list of skills with their name, description, author, version, download URL, and source catalog. Use this to help the user find and install new capabilities.',
         input_schema: {
             type: 'object',
             properties: {
@@ -229,6 +229,8 @@ const handlers = {
 
     async skill_marketplace_search(input) {
         const { query } = input;
+        // Android-side ConfigManager now manages multiple skill source URLs.
+        // This is the default ClawHub catalog; users can add/remove sources in Settings.
         const baseUrl = 'https://api.clawhub.ai/v1';
         const url = (!query || query.trim() === '')
             ? `${baseUrl}/skills?limit=50&sort=createdAt`
@@ -274,6 +276,7 @@ const handlers = {
                     author: typeof s.author === 'object' ? s.author.name : s.author || '',
                     version: s.latestVersion?.version || s.version || "1.0.0",
                     downloadUrl: s.download?.url || s.downloadUrl || s.download || '',
+                    source: 'ClawHub',
                     emoji: s.emoji || '🧩',
                     imageUrl: typeof s.image === 'object' ? s.image.url : s.image || '',
                     triggers: Array.isArray(s.triggers) ? s.triggers : [],

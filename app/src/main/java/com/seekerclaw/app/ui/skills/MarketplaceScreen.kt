@@ -48,7 +48,7 @@ fun MarketplaceScreen(onBack: () -> Unit) {
         if (searchQuery.length >= 2) {
             isLoading = true
             error = null
-            val result = MarketplaceRepository.searchSkills(searchQuery)
+            val result = MarketplaceRepository.searchSkills(searchQuery, context)
             isLoading = false
             result.onSuccess {
                 skills = it
@@ -58,7 +58,7 @@ fun MarketplaceScreen(onBack: () -> Unit) {
         } else if (searchQuery.isEmpty()) {
             isLoading = true
             error = null
-            val result = MarketplaceRepository.searchSkills("")
+            val result = MarketplaceRepository.searchSkills("", context)
             isLoading = false
             result.onSuccess {
                 skills = it
@@ -119,7 +119,7 @@ fun MarketplaceScreen(onBack: () -> Unit) {
             )
             Spacer(Modifier.width(12.dp))
             Text(
-                text = "ClawHub Marketplace",
+                text = "Marketplace",
                 fontFamily = RethinkSans,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -147,7 +147,7 @@ fun MarketplaceScreen(onBack: () -> Unit) {
         } else if (skills.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = if (searchQuery.isEmpty()) "Explore community skills" else "No skills found",
+                    text = if (searchQuery.isEmpty()) "Explore skills from connected catalogs" else "No skills found",
                     color = SeekerClawColors.TextDim,
                     fontFamily = RethinkSans
                 )
@@ -228,11 +228,12 @@ private fun MarketplaceSearchField(
         Box(modifier = Modifier.weight(1f)) {
             if (query.isEmpty()) {
                 Text(
-                    text = "Search community skills...",
+                    text = "Search marketplace skills...",
                     fontFamily = RethinkSans,
                     fontSize = 14.sp,
                     color = SeekerClawColors.TextDim,
                 )
+                }
             }
             BasicTextField(
                 value = query,
@@ -246,7 +247,6 @@ private fun MarketplaceSearchField(
                 ),
                 modifier = Modifier.fillMaxWidth(),
             )
-        }
         if (query.isNotEmpty()) {
             Spacer(Modifier.width(8.dp))
             Text(
@@ -292,12 +292,23 @@ private fun MarketplaceSkillCard(
                     color = SeekerClawColors.TextPrimary,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = "v${skill.version}",
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (skill.source.isNotEmpty()) {
+                        Text(
+                            text = skill.source,
+                            fontFamily = RethinkSans,
+                            fontSize = 11.sp,
+                            color = SeekerClawColors.Accent,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text(
+                        text = "v${skill.version}",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
                     color = SeekerClawColors.TextDim,
                 )
+                }
             }
             if (skill.author.isNotEmpty()) {
                 Text(

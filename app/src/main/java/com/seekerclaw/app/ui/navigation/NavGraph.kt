@@ -59,6 +59,7 @@ import kotlinx.serialization.Serializable
 @Serializable object McpConfigRoute
 @Serializable object DiscordConfigRoute
 @Serializable data class EnvVarsRoute(val prefillKey: String? = null)
+@Serializable object SkillSourcesRoute
 
 data class BottomNavItem(
     val label: String,
@@ -258,6 +259,9 @@ fun SeekerClawNavHost() {
                     onNavigateToEnvVars = {
                         navController.navigate(EnvVarsRoute())
                     },
+                    onNavigateToSkillSources = {
+                        navController.navigate(SkillSourcesRoute)
+                    },
                 )
             }
             composable<ProviderConfigRoute> {
@@ -290,6 +294,11 @@ fun SeekerClawNavHost() {
                 com.seekerclaw.app.ui.settings.EnvVarsScreen(
                     onBack = { navController.popBackStack() },
                     prefillKey = route.prefillKey,
+                )
+            }
+            composable<SkillSourcesRoute> {
+                com.seekerclaw.app.ui.settings.SkillSourcesScreen(
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable<DiscordConfigRoute> {

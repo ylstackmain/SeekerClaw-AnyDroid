@@ -1,6 +1,11 @@
 package com.seekerclaw.app.ui.skills
 
+import android.content.Context
+import com.seekerclaw.app.config.ConfigManager
+import com.seekerclaw.app.config.SkillSource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -9,22 +14,39 @@ import java.net.URL
 import java.net.URLEncoder
 
 object MarketplaceRepository {
-    private const val BASE_URL = "https://api.clawhub.ai/v1"
 
-    suspend fun searchSkills(query: String): Result<List<MarketplaceSkill>> = withContext(Dispatchers.IO) {
+    suspend fun searchSkills(query: String, context: Context): Result<List<MarketplaceSkill>> = withContext(Dispatchers.IO) {
         runCatching {
+            val sources = ConfigManager.loadSkillSources(context).filter { it.enabled }
+            if (sources.isEmpty()) return@runCatching emptyList()
+
+            // Search all enabled sources in parallel
+            val deferredResults = sources.map { source ->
+                async {
+                    searchSource(source, query)
+                }
+            }
+            val allResults = deferredResults.awaitAll().flatten()
+            // Deduplicate by skill ID (last source wins on conflict)
+            allResults.associateBy { it.id }.values.toList()
+        }
+    }
+
+    private suspend fun searchSource(source: SkillSource, query: String): List<MarketplaceSkill> {
+        return runCatching {
+            val cleanUrl = source.url.trimEnd('/')
             val url = if (query.isBlank()) {
-                "$BASE_URL/skills?limit=50&sort=createdAt"
+                "$cleanUrl/skills?limit=50&sort=createdAt"
             } else {
                 val encodedQuery = URLEncoder.encode(query, "UTF-8")
-                "$BASE_URL/skills?q=$encodedQuery"
+                "$cleanUrl/skills?q=$encodedQuery"
             }
             val (status, body) = httpGet(url)
             if (status !in 200..299) {
-                error("Marketplace search failed ($status)")
+                return@runCatching emptyList()
             }
             val responseObj = JSONObject(body)
-            // Handle both direct array responses and wrapped objects with "items" or "skills" keys
+            // Handle various response shapes
             val arr = when {
                 responseObj.has("items") -> responseObj.getJSONArray("items")
                 responseObj.has("skills") -> responseObj.getJSONArray("skills")
@@ -40,10 +62,10 @@ object MarketplaceRepository {
             val skills = mutableListOf<MarketplaceSkill>()
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
-                skills.add(parseSkill(obj))
+                skills.add(parseSkill(obj, source.name))
             }
             skills
-        }
+        }.getOrDefault(emptyList())
     }
 
     suspend fun downloadSkill(downloadUrl: String): Result<String> = withContext(Dispatchers.IO) {
@@ -56,40 +78,33 @@ object MarketplaceRepository {
         }
     }
 
-    private fun parseSkill(obj: JSONObject): MarketplaceSkill {
-        // ClawHub API v2 fields — nested structure
+    private fun parseSkill(obj: JSONObject, sourceName: String): MarketplaceSkill {
         val name = obj.optString("name", obj.optString("displayName", ""))
         val description = obj.optString("description", obj.optString("summary", ""))
         val emoji = obj.optString("emoji", "🧩")
-        // author may be string or nested object {"name": "..."}
         val authorRaw = obj.opt("author")
         val author = when {
             authorRaw is JSONObject -> authorRaw.optString("name", "")
             authorRaw is String -> authorRaw
             else -> ""
         }
-        // image may be string or nested object {"url": "..."}
         val imageRaw = obj.opt("image")
         val imageUrl = when {
             imageRaw is JSONObject -> imageRaw.optString("url", "")
             imageRaw is String -> imageRaw
             else -> ""
         }
-        // download may be string or nested object {"url": "..."}
         val downloadRaw = obj.opt("download")
         val downloadUrl = when {
             downloadRaw is JSONObject -> downloadRaw.optString("url", "")
             downloadRaw is String -> downloadRaw
             else -> ""
         }
-        // version from latestVersion object or direct version field
         val version = obj.optJSONObject("latestVersion")?.optString("version")
             ?: obj.optString("version", "1.0.0")
-        // triggers array
         val triggers = obj.optJSONArray("triggers")?.let { arr ->
             List(arr.length()) { arr.getString(it) }
         } ?: emptyList()
-        // requiresEnv array
         val requiresEnv = obj.optJSONArray("requiresEnv")?.let { arr ->
             List(arr.length()) { arr.getString(it) }
         } ?: emptyList()
@@ -104,6 +119,7 @@ object MarketplaceRepository {
             downloadUrl = downloadUrl,
             triggers = triggers,
             requiresEnv = requiresEnv,
+            source = sourceName,
         )
     }
 
