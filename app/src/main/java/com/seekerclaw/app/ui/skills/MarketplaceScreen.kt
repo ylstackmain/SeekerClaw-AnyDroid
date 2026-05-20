@@ -247,7 +247,6 @@ private fun MarketplaceSearchField(
                 ),
                 modifier = Modifier.fillMaxWidth(),
             )
-        }
         if (query.isNotEmpty()) {
             Spacer(Modifier.width(8.dp))
             Text(

@@ -304,6 +304,7 @@ fun SeekerClawNavHost() {
             composable<DiscordConfigRoute> {
                 com.seekerclaw.app.ui.settings.DiscordConfigScreen(
                     onBack = { navController.popBackStack() }
+                )
             }
         }
     }

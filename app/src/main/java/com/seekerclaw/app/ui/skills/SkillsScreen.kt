@@ -23,7 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.animation.expandVertically
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -135,27 +135,30 @@ private suspend fun createSkillTemplate(context: android.content.Context): Boole
         val skillFile = File(skillDir, "SKILL.md")
         if (skillFile.exists()) return@withContext(false)
         
-        val template = "---" + System.lineSeparator() +
-            "name: my-custom-skill" + System.lineSeparator() +
-            "description: "A custom skill - describe what it does here"" + System.lineSeparator() +
-            "version: "1.0.0"" + System.lineSeparator() +
-            "emoji: "\uD83D\uDD27"" + System.lineSeparator() +
-            "triggers:" + System.lineSeparator() +
-            "  - keyword1" + System.lineSeparator() +
-            "  - keyword2" + System.lineSeparator() +
-            "allowed-tools:" + System.lineSeparator() +
-            "  - web_fetch" + System.lineSeparator() +
-            "  - read" + System.lineSeparator() +
-            "  - write" + System.lineSeparator() +
-            "---" + System.lineSeparator() +
-            System.lineSeparator() +
-            "# My Custom Skill" + System.lineSeparator() +
-            System.lineSeparator() +
-            "Use this section to give the AI detailed instructions for your skill." + System.lineSeparator() +
-            System.lineSeparator() +
-            "## Behavior" + System.lineSeparator() +
-            System.lineSeparator() +
-            "Describe what the skill should do when triggered..."
+        val nl = System.lineSeparator()
+        val template = StringBuilder().apply {
+            append("---").append(nl)
+            append("name: my-custom-skill").append(nl)
+            append("description: "A custom skill - describe what it does here"").append(nl)
+            append("version: "1.0.0"").append(nl)
+            append("emoji: "\uD83D\uDD27"").append(nl)
+            append("triggers:").append(nl)
+            append("  - keyword1").append(nl)
+            append("  - keyword2").append(nl)
+            append("allowed-tools:").append(nl)
+            append("  - web_fetch").append(nl)
+            append("  - read").append(nl)
+            append("  - write").append(nl)
+            append("---").append(nl)
+            append(nl)
+            append("# My Custom Skill").append(nl)
+            append(nl)
+            append("Use this section to give the AI detailed instructions for your skill.").append(nl)
+            append(nl)
+            append("## Behavior").append(nl)
+            append(nl)
+            append("Describe what the skill should do when triggered...")
+        }.toString()
         skillFile.writeText(template)
         true
     } catch (e: Exception) {
