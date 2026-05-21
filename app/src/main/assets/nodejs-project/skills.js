@@ -581,20 +581,20 @@ function buildSkillsSection(skills) {
     lines.push('');
 
     for (const skill of skills) {
-        lines.push(`### ${skill.name}`);
+        lines.push(`<context7:skill name="${skill.name}" version="${skill.version || '1.0.0'}" category="${skill.category || 'General'}">`);
         if (skill.description) {
-            lines.push(skill.description);
+            lines.push(`<context7:description>${skill.description}</context7:description>`);
         }
-        lines.push('');
         if (skill.instructions) {
-            lines.push('**Instructions:**');
+            lines.push('<context7:instructions>');
             lines.push(skill.instructions);
-            lines.push('');
+            lines.push('</context7:instructions>');
         }
         if (skill.tools.length > 0) {
-            lines.push('**Recommended tools:** ' + skill.tools.join(', '));
-            lines.push('');
+            lines.push(`<context7:recommended_tools>${skill.tools.join(', ')}</context7:recommended_tools>`);
         }
+        lines.push('</context7:skill>');
+        lines.push('');
     }
 
     return lines.join('\n');
