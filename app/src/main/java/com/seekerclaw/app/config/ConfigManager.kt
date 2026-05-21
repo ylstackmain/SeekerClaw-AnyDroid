@@ -1748,6 +1748,11 @@ object ConfigManager {
             url = "https://api.clawhub.ai/v1",
             enabled = true,
         ),
+        SkillSource(
+            name = "skills.sh",
+            url = "https://api.skills.sh/v1",
+            enabled = true,
+        ),
     )
 
 

@@ -77,14 +77,38 @@ object SkillsRepository {
             ?: run { Log.w(TAG, "Skipping skill '$filePath': no name found"); return null }
         val description = (fm["description"] as? String)?.trim() ?: ""
         val version = (fm["version"] as? String)?.trim() ?: ""
-        val category = (fm["category"] as? String)?.trim() ?: "General"
-        val isEnabled = when (val e = fm["enabled"]) {
-            is Boolean -> e
-            is String -> e.lowercase() == "true"
+        
+        // Category parsing: prefer top-level, then metadata.openclaw.category
+        var category = (fm["category"] as? String)?.trim()
+        if (category == null) {
+            val metadata = fm["metadata"] as? Map<*, *>
+            val openclaw = metadata?.get("openclaw") as? Map<*, *>
+            category = (openclaw?.get("category") as? String)?.trim()
+        }
+        if (category == null) category = "General"
+
+        // Enabled state: prefer top-level, then metadata.openclaw.enabled
+        var isEnabledRaw = fm["enabled"]
+        if (isEnabledRaw == null) {
+            val metadata = fm["metadata"] as? Map<*, *>
+            val openclaw = metadata?.get("openclaw") as? Map<*, *>
+            isEnabledRaw = openclaw?.get("enabled")
+        }
+        
+        val isEnabled = when (isEnabledRaw) {
+            is Boolean -> isEnabledRaw
+            is String -> isEnabledRaw.lowercase() == "true"
             else -> true
         }
+
         val emoji = (fm["emoji"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: run {
+                val metadata = fm["metadata"] as? Map<*, *>
+                val openclaw = metadata?.get("openclaw") as? Map<*, *>
+                (openclaw?.get("emoji") as? String)?.trim()
+            }
             ?: extractFrontmatterLine(content, "emoji")
+        
         val imageUrl = (fm["image"] as? String)?.trim()?.takeIf {
             it.startsWith("https://") || it.startsWith("http://")
         } ?: ""

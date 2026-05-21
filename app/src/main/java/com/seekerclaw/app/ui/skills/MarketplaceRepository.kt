@@ -15,7 +15,7 @@ import java.net.URLEncoder
 
 object MarketplaceRepository {
 
-    suspend fun searchSkills(query: String, context: Context): Result<List<MarketplaceSkill>> = withContext(Dispatchers.IO) {
+    suspend fun searchSkills(query: String, context: Context, limit: Int = 50, offset: Int = 0): Result<List<MarketplaceSkill>> = withContext(Dispatchers.IO) {
         runCatching {
             val sources = ConfigManager.loadSkillSources(context).filter { it.enabled }
             if (sources.isEmpty()) return@runCatching emptyList()
@@ -23,7 +23,7 @@ object MarketplaceRepository {
             // Search all enabled sources in parallel
             val deferredResults = sources.map { source ->
                 async {
-                    searchSource(source, query)
+                    searchSource(source, query, limit, offset)
                 }
             }
             val allResults = deferredResults.awaitAll().flatten()
@@ -32,14 +32,14 @@ object MarketplaceRepository {
         }
     }
 
-    private suspend fun searchSource(source: SkillSource, query: String): List<MarketplaceSkill> {
+    private suspend fun searchSource(source: SkillSource, query: String, limit: Int, offset: Int): List<MarketplaceSkill> {
         return runCatching {
             val cleanUrl = source.url.trimEnd('/')
             val url = if (query.isBlank()) {
-                "$cleanUrl/skills?limit=50&sort=createdAt"
+                "$cleanUrl/skills?limit=$limit&offset=$offset&sort=createdAt"
             } else {
                 val encodedQuery = URLEncoder.encode(query, "UTF-8")
-                "$cleanUrl/skills?q=$encodedQuery"
+                "$cleanUrl/skills?q=$encodedQuery&limit=$limit&offset=$offset"
             }
             val (status, body) = httpGet(url)
             if (status !in 200..299) {
