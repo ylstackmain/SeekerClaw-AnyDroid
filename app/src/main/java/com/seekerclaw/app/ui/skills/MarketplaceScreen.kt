@@ -7,14 +7,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -22,7 +21,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.seekerclaw.app.config.ConfigManager
 import com.seekerclaw.app.ui.components.cornerGlowBorder
 import com.seekerclaw.app.ui.theme.RethinkSans
 import com.seekerclaw.app.ui.theme.SeekerClawColors
@@ -31,7 +29,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
 
 @Composable
 fun MarketplaceScreen(onBack: () -> Unit) {
@@ -40,31 +37,66 @@ fun MarketplaceScreen(onBack: () -> Unit) {
     var searchQuery by remember { mutableStateOf("") }
     var skills by remember { mutableStateOf<List<MarketplaceSkill>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
+    var isLoadingMore by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var selectedSkill by remember { mutableStateOf<MarketplaceSkill?>(null) }
+    var offset by remember { mutableIntStateOf(0) }
+    var hasMore by remember { mutableStateOf(true) }
+    val limit = 50
     val shape = remember { RoundedCornerShape(SeekerClawColors.CornerRadius) }
+    val listState = rememberLazyListState()
+
+    fun loadSkills(reset: Boolean = false) {
+        scope.launch {
+            if (reset) {
+                isLoading = true
+                offset = 0
+                skills = emptyList()
+                hasMore = true
+            } else {
+                isLoadingMore = true
+            }
+            error = null
+            
+            val result = MarketplaceRepository.searchSkills(searchQuery, context, limit = limit, offset = offset)
+            
+            result.onSuccess { newSkills ->
+                if (reset) {
+                    skills = newSkills
+                } else {
+                    // Deduplicate
+                    val existingIds = skills.map { it.id }.toSet()
+                    skills = skills + newSkills.filter { it.id !in existingIds }
+                }
+                hasMore = newSkills.size >= limit
+                offset += newSkills.size
+            }.onFailure {
+                error = it.message
+            }
+            
+            isLoading = false
+            isLoadingMore = false
+        }
+    }
 
     LaunchedEffect(searchQuery) {
-        if (searchQuery.length >= 2) {
-            isLoading = true
-            error = null
-            val result = MarketplaceRepository.searchSkills(searchQuery, context)
-            isLoading = false
-            result.onSuccess {
-                skills = it
-            }.onFailure {
-                error = it.message
-            }
-        } else if (searchQuery.isEmpty()) {
-            isLoading = true
-            error = null
-            val result = MarketplaceRepository.searchSkills("", context)
-            isLoading = false
-            result.onSuccess {
-                skills = it
-            }.onFailure {
-                error = it.message
-            }
+        // Debounce search
+        if (searchQuery.length >= 2 || searchQuery.isEmpty()) {
+            loadSkills(reset = true)
+        }
+    }
+
+    // Infinite scroll logic
+    val shouldLoadMore = remember {
+        derivedStateOf {
+            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+            lastVisibleItem != null && lastVisibleItem.index >= skills.size - 5 && hasMore && !isLoading && !isLoadingMore
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore.value) {
+        if (shouldLoadMore.value) {
+            loadSkills(reset = false)
         }
     }
 
@@ -140,7 +172,7 @@ fun MarketplaceScreen(onBack: () -> Unit) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = SeekerClawColors.Accent)
             }
-        } else if (error != null) {
+        } else if (error != null && skills.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Error: $error", color = SeekerClawColors.Error, fontFamily = RethinkSans)
             }
@@ -154,6 +186,7 @@ fun MarketplaceScreen(onBack: () -> Unit) {
             }
         } else {
             LazyColumn(
+                state = listState,
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize(),
@@ -182,6 +215,14 @@ fun MarketplaceScreen(onBack: () -> Unit) {
                             }
                         }
                     )
+                }
+                
+                if (isLoadingMore) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = SeekerClawColors.Accent, modifier = Modifier.size(24.dp))
+                        }
+                    }
                 }
             }
         }
@@ -233,7 +274,6 @@ private fun MarketplaceSearchField(
                     fontSize = 14.sp,
                     color = SeekerClawColors.TextDim,
                 )
-                }
             }
             BasicTextField(
                 value = query,
@@ -247,6 +287,7 @@ private fun MarketplaceSearchField(
                 ),
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
         if (query.isNotEmpty()) {
             Spacer(Modifier.width(8.dp))
             Text(
@@ -304,10 +345,10 @@ private fun MarketplaceSkillCard(
                     }
                     Text(
                         text = "v${skill.version}",
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    color = SeekerClawColors.TextDim,
-                )
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = SeekerClawColors.TextDim,
+                    )
                 }
             }
             if (skill.author.isNotEmpty()) {

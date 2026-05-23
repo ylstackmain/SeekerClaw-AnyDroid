@@ -694,23 +694,21 @@ function buildSystemBlocks(matchedSkills = [], chatId = null, activeModel = MODE
     // Skills section - OpenClaw semantic selection style
     if (allSkills.length > 0) {
         lines.push('## Skills (mandatory)');
-        lines.push('Before replying: scan the <available_skills> list below.');
+        lines.push('Before replying: scan the <context7:available_skills> list below.');
         lines.push('- If exactly one skill clearly applies to the user\'s request: use skill_read to load it, then follow its instructions.');
         lines.push('- If multiple skills could apply: choose the most specific one.');
         lines.push('- If none clearly apply: do not load any skill, just respond normally.');
         lines.push('');
-        lines.push("<available_skills>");
+        lines.push("<context7:available_skills>");
         for (const skill of allSkills) {
             const emoji = skill.emoji || "⚡";
             const desc = skill.description.split("\n")[0] || "No description";
-            lines.push(`- name: ${skill.name}`);
-            lines.push(`  version: ${skill.version || "1.0.0"}`);
-            lines.push(`  category: ${skill.category || "General"}`);
-            lines.push(`  emoji: ${emoji}`);
-            lines.push(`  description: ${desc}`);
+            lines.push(`<context7:skill name="${skill.name}" version="${skill.version || "1.0.0"}" category="${skill.category || "General"}" emoji="${emoji}">`);
+            lines.push(`  <context7:description>${desc}</context7:description>`);
+            lines.push(`</context7:skill>`);
             lines.push("");
         }
-        lines.push("</available_skills>");
+        lines.push("</context7:available_skills>");
         lines.push('');
         lines.push('**Skill auto-install:** When a user sends a skill file, the system installs it automatically before your turn starts. If a message begins with `[Skill just installed.]`, the skill is already installed and working — do NOT search for, re-download, or re-install the file. Just acknowledge the install and respond to any accompanying message.');
         lines.push('- When a skill drives external API writes, assume rate limits: prefer fewer larger writes, avoid tight one-item loops, serialize bursts when possible, and respect 429/Retry-After.');
@@ -1298,22 +1296,22 @@ function buildSystemBlocks(matchedSkills = [], chatId = null, activeModel = MODE
     // Active skills for this specific request (varies per message)
     if (matchedSkills.length > 0) {
         dynamicLines.push('');
-        dynamicLines.push('## Active Skills for This Request');
-        dynamicLines.push('The following skills have been automatically loaded based on keywords:');
-        dynamicLines.push('');
+        dynamicLines.push("<context7:active_skills>");
         for (const skill of matchedSkills) {
-            const emoji = skill.emoji ? `${skill.emoji} ` : '';
-            dynamicLines.push(`### ${emoji}${skill.name}`);
+            const emoji = skill.emoji ? `${skill.emoji} ` : "";
+            dynamicLines.push(`<context7:active_skill name="${skill.name}" version="${skill.version || "1.0.0"}" category="${skill.category || "General"}" emoji="${emoji}">`);
             if (skill.description) {
-                dynamicLines.push(skill.description);
-                dynamicLines.push('');
+                dynamicLines.push(`  <context7:description>${skill.description}</context7:description>`);
             }
             if (skill.instructions) {
-                dynamicLines.push('**Follow these instructions:**');
+                dynamicLines.push("  <context7:instructions>");
                 dynamicLines.push(skill.instructions);
-                dynamicLines.push('');
+                dynamicLines.push("  </context7:instructions>");
             }
+            dynamicLines.push("</context7:active_skill>");
+            dynamicLines.push("");
         }
+        dynamicLines.push("</context7:active_skills>");
     }
 
     return { stable: stablePrompt, dynamic: dynamicLines.join('\n') };
