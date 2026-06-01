@@ -51,10 +51,10 @@ const handlerMap = Object.assign({},
     systemMod.handlers,
     envMod.handlers,
     {
-        agent_create: (args, chatId) => agentMod.handleAgentTool('agent_create', args, chatId),
-        agent_list: (args, chatId) => agentMod.handleAgentTool('agent_list', args, chatId),
-        agent_spawn: (args, chatId) => agentMod.handleAgentTool('agent_spawn', args, chatId),
-        agent_delete: (args, chatId) => agentMod.handleAgentTool('agent_delete', args, chatId),
+        agent_create: (args, chatId, options) => agentMod.handleAgentTool('agent_create', args, chatId, options),
+        agent_list: (args, chatId, options) => agentMod.handleAgentTool('agent_list', args, chatId, options),
+        agent_spawn: (args, chatId, options) => agentMod.handleAgentTool('agent_spawn', args, chatId, options),
+        agent_delete: (args, chatId, options) => agentMod.handleAgentTool('agent_delete', args, chatId, options),
     }
 );
 
@@ -175,7 +175,7 @@ function requestConfirmation(chatId, toolName, input) {
 
 // ── executeTool() dispatcher ─────────────────────────────────────────────────
 
-async function executeTool(name, input, chatId) {
+async function executeTool(name, input, chatId, options = {}) {
     log(`Executing tool: ${name}`, 'DEBUG');
     // OpenClaw parity: normalize whitespace-padded tool names
     name = typeof name === 'string' ? name.trim() : '';
@@ -184,7 +184,7 @@ async function executeTool(name, input, chatId) {
     // Look up handler in dispatch map
     const handler = handlerMap[name];
     if (handler) {
-        return await handler(input, chatId);
+        return await handler(input, chatId, options);
     }
 
     // Route MCP tools (mcp__<server>__<tool>) to MCPManager

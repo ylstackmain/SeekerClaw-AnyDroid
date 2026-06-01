@@ -90,13 +90,14 @@ If you change this file, tell the user — it's your soul, and they should know.
 _This file is yours to evolve. As you learn who you are, update it._
 `;
 
-function loadSoul() {
-    if (fs.existsSync(SOUL_PATH)) {
-        return fs.readFileSync(SOUL_PATH, 'utf8');
+function loadSoul(baseDir = workDir) {
+    const soulPath = path.join(baseDir, 'SOUL.md');
+    if (fs.existsSync(soulPath)) {
+        return fs.readFileSync(soulPath, 'utf8');
     }
     // Seed default SOUL.md to workspace (only on first launch)
     try {
-        fs.writeFileSync(SOUL_PATH, DEFAULT_SOUL, 'utf8');
+        fs.writeFileSync(soulPath, DEFAULT_SOUL, 'utf8');
         log('Seeded default SOUL.md to workspace', 'INFO');
     } catch (e) {
         log(`Warning: Could not seed SOUL.md: ${e.message}`, 'WARN');
@@ -104,16 +105,18 @@ function loadSoul() {
     return DEFAULT_SOUL;
 }
 
-function loadBootstrap() {
-    if (fs.existsSync(BOOTSTRAP_PATH)) {
-        return fs.readFileSync(BOOTSTRAP_PATH, 'utf8');
+function loadBootstrap(baseDir = workDir) {
+    const p = path.join(baseDir, 'BOOTSTRAP.md');
+    if (fs.existsSync(p)) {
+        return fs.readFileSync(p, 'utf8');
     }
     return null;
 }
 
-function loadIdentity() {
-    if (fs.existsSync(IDENTITY_PATH)) {
-        const content = fs.readFileSync(IDENTITY_PATH, 'utf8');
+function loadIdentity(baseDir = workDir) {
+    const p = path.join(baseDir, 'IDENTITY.md');
+    if (fs.existsSync(p)) {
+        const content = fs.readFileSync(p, 'utf8');
         // Kotlin pre-creates template with placeholders — treat as no identity
         if (content.includes('(not yet named)')) return null;
         return content;
@@ -121,9 +124,10 @@ function loadIdentity() {
     return null;
 }
 
-function loadUser() {
-    if (fs.existsSync(USER_PATH)) {
-        const content = fs.readFileSync(USER_PATH, 'utf8');
+function loadUser(baseDir = workDir) {
+    const p = path.join(baseDir, 'USER.md');
+    if (fs.existsSync(p)) {
+        const content = fs.readFileSync(p, 'utf8');
         // Kotlin pre-creates template with placeholders — treat as no user profile
         if (content.includes('(not yet known)')) return null;
         return content;
@@ -135,33 +139,39 @@ function loadUser() {
 // MEMORY FILES
 // ============================================================================
 
-function loadMemory() {
-    if (fs.existsSync(MEMORY_PATH)) {
-        return fs.readFileSync(MEMORY_PATH, 'utf8');
+function loadMemory(baseDir = workDir) {
+    const p = path.join(baseDir, 'MEMORY.md');
+    if (fs.existsSync(p)) {
+        return fs.readFileSync(p, 'utf8');
     }
     return '';
 }
 
-function saveMemory(content) {
-    fs.writeFileSync(MEMORY_PATH, content, 'utf8');
+function saveMemory(content, baseDir = workDir) {
+    const p = path.join(baseDir, 'MEMORY.md');
+    fs.writeFileSync(p, content, 'utf8');
     log('Memory updated', 'DEBUG');
 }
 
-function getDailyMemoryPath() {
+function getDailyMemoryPath(baseDir = workDir) {
     const date = localDateStr();
-    return path.join(MEMORY_DIR, `${date}.md`);
+    return path.join(baseDir, 'memory', `${date}.md`);
 }
 
-function loadDailyMemory() {
-    const dailyPath = getDailyMemoryPath();
+function loadDailyMemory(baseDir = workDir) {
+    const dailyPath = getDailyMemoryPath(baseDir);
     if (fs.existsSync(dailyPath)) {
         return fs.readFileSync(dailyPath, 'utf8');
     }
     return '';
 }
 
-function appendDailyMemory(content) {
-    const dailyPath = getDailyMemoryPath();
+function appendDailyMemory(content, baseDir = workDir) {
+    const dailyPath = getDailyMemoryPath(baseDir);
+    // Ensure memory directory exists
+    const dailyDir = path.dirname(dailyPath);
+    if (!fs.existsSync(dailyDir)) fs.mkdirSync(dailyDir, { recursive: true });
+    
     const timestamp = new Date().toLocaleTimeString();
     const entry = `\n## ${timestamp}\n${content}\n`;
     fs.appendFileSync(dailyPath, entry, 'utf8');
@@ -178,7 +188,7 @@ const STOP_WORDS = new Set(['the','a','an','is','are','was','were','be','been','
     'that','this','it','i','me','my','we','our','you','your','he','she','they','them',
     'and','or','but','not','no','if','so','what','when','where','how','who','which']);
 
-function searchMemory(query, topK = 5) {
+function searchMemory(query, topK = 5, baseDir = workDir) {
     if (!query) return [];
     topK = Math.max(1, topK || 5);
 
@@ -221,7 +231,7 @@ function searchMemory(query, topK = 5) {
                         : 0;
 
                     const score = tfScore * 0.7 + recencyScore * 0.3;
-                    const relPath = path.relative(workDir, filePath) || filePath;
+                    const relPath = path.relative(baseDir, filePath) || filePath;
 
                     return {
                         file: relPath,
@@ -245,8 +255,9 @@ function searchMemory(query, topK = 5) {
     const results = [];
     const searchLower = query.toLowerCase();
 
-    if (fs.existsSync(MEMORY_PATH)) {
-        const lines = fs.readFileSync(MEMORY_PATH, 'utf8').split('\n');
+    const memoryPath = path.join(baseDir, 'MEMORY.md');
+    if (fs.existsSync(memoryPath)) {
+        const lines = fs.readFileSync(memoryPath, 'utf8').split('\n');
         lines.forEach((line, idx) => {
             if (line.toLowerCase().includes(searchLower)) {
                 results.push({ file: 'MEMORY.md', startLine: idx + 1, endLine: idx + 1,
@@ -255,10 +266,11 @@ function searchMemory(query, topK = 5) {
         });
     }
 
-    if (fs.existsSync(MEMORY_DIR)) {
-        for (const f of fs.readdirSync(MEMORY_DIR).filter(f => f.endsWith('.md'))) {
+    const memoryDir = path.join(baseDir, 'memory');
+    if (fs.existsSync(memoryDir)) {
+        for (const f of fs.readdirSync(memoryDir).filter(f => f.endsWith('.md'))) {
             if (results.length >= topK) break;
-            const lines = fs.readFileSync(path.join(MEMORY_DIR, f), 'utf8').split('\n');
+            const lines = fs.readFileSync(path.join(memoryDir, f), 'utf8').split('\n');
             lines.forEach((line, idx) => {
                 if (results.length < topK && line.toLowerCase().includes(searchLower)) {
                     results.push({ file: `memory/${f}`, startLine: idx + 1, endLine: idx + 1,
@@ -293,10 +305,11 @@ Read this during each heartbeat check. Follow strictly.
 If nothing needs attention, reply HEARTBEAT_OK.
 `;
 
-function seedHeartbeatMd() {
-    if (fs.existsSync(HEARTBEAT_PATH)) return; // never overwrite existing user content
+function seedHeartbeatMd(baseDir = workDir) {
+    const heartbeatPath = path.join(baseDir, 'HEARTBEAT.md');
+    if (fs.existsSync(heartbeatPath)) return; // never overwrite existing user content
     try {
-        fs.writeFileSync(HEARTBEAT_PATH, DEFAULT_HEARTBEAT_MD, 'utf8');
+        fs.writeFileSync(heartbeatPath, DEFAULT_HEARTBEAT_MD, 'utf8');
         log('Seeded default HEARTBEAT.md to workspace', 'INFO');
     } catch (e) {
         log(`Warning: Could not seed HEARTBEAT.md: ${e.message}`, 'WARN');

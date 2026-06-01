@@ -746,6 +746,9 @@ telegram('getMe')
             // Wire MCP routing into tools.js
             setMcpExecuteTool((name, input) => mcpManager.executeTool(name, input));
 
+            // Inject chat function into agent tools for spawning
+            require('./tools/agent').setChatFn(chat);
+
             // DeerFlow P2: Wire full tool registry (static + MCP) for tool_search
             setFullToolRegistry(() => [...TOOLS, ...mcpManager.getAllTools()]);
 

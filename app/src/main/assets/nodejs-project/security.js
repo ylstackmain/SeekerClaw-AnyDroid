@@ -121,13 +121,13 @@ function redactSecrets(msg) {
 // ============================================================================
 
 // Validate that a resolved file path is within workspace (prevents path traversal)
-function safePath(userPath) {
-    // Resolve to absolute, then check it starts with workDir
-    const resolved = path.resolve(workDir, userPath);
+function safePath(userPath, baseDir = workDir) {
+    // Resolve to absolute, then check it starts with baseDir
+    const resolved = path.resolve(baseDir, userPath);
     // Normalize both to handle trailing separators
-    const normalizedWork = path.resolve(workDir) + path.sep;
+    const normalizedBase = path.resolve(baseDir) + path.sep;
     const normalizedResolved = path.resolve(resolved);
-    if (normalizedResolved !== path.resolve(workDir) && !normalizedResolved.startsWith(normalizedWork)) {
+    if (normalizedResolved !== path.resolve(baseDir) && !normalizedResolved.startsWith(normalizedBase)) {
         return null; // Path escapes workspace
     }
     return normalizedResolved;

@@ -607,13 +607,13 @@ function buildSystemBlocks(matchedSkills = [], chatId = null, activeModel = MODE
 
     // Tooling section - tool schemas are provided via the tools API array;
     // only behavioral guidance here to avoid duplicating ~1,500 tokens of tool descriptions
-## Multi-Agent Orchestration
-You are a Lead Agent capable of managing a team of specialized sub-agents.
-- **agent_create**: Create a new agent profile with a specific SOUL.md personality.
-- **agent_list**: List all currently available agent profiles.
-- **agent_spawn**: Delegate a task to a sub-agent. This is an isolated session where the sub-agent will use its own personality and tools to complete the task and return the result to you.
-- **agent_delete**: Remove an agent profile.
-Use sub-agents for specialized tasks (e.g., deep research, data processing, security audits) to keep your main conversation context clean and efficient.
+    lines.push("## Multi-Agent Orchestration");
+    lines.push("You are a Lead Agent capable of managing a team of specialized sub-agents.");
+    lines.push("- **agent_create**: Create a new agent profile with a specific SOUL.md personality.");
+    lines.push("- **agent_list**: List all currently available agent profiles.");
+    lines.push("- **agent_spawn**: Delegate a task to a sub-agent. This is an isolated session where the sub-agent will use its own personality and tools to complete the task and return the result to you.");
+    lines.push("- **agent_delete**: Remove an agent profile.");
+    lines.push("Use sub-agents for specialized tasks (e.g., deep research, data processing, security audits) to keep your main conversation context clean and efficient.");
 
     lines.push('## Tooling');
     lines.push('Tools are provided via the tools API. Call tools exactly as listed by name.');

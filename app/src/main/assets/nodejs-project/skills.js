@@ -553,7 +553,19 @@ function loadSkills(overrideWorkDir = null) {
 // SKILL MATCHING & PROMPT BUILDING
 // ============================================================================
 
-function findMatchingSkills(message) {
+function findMatchingSkills(message, overrideWorkDir = null) {
+    const skills = loadSkills(overrideWorkDir);
+    const lowerMsg = message.toLowerCase();
+
+    const matched = [];
+    for (const skill of skills) {
+        if (matched.length >= 2) break;
+
+        const hasTrigger = skill.triggers.some(trigger => {
+            // Multi-word triggers: substring match is fine
+            if (trigger.includes(' ')) return lowerMsg.includes(trigger);
+            // Single-word triggers: require word boundary
+            const regex = new RegExp(`\\b${trigger.replace(/[.*+?^${}()|[\]\\]/g, '\\function findMatchingSkills(message) {
     const skills = loadSkills();
     const lowerMsg = message.toLowerCase();
 
@@ -566,6 +578,14 @@ function findMatchingSkills(message) {
             if (trigger.includes(' ')) return lowerMsg.includes(trigger);
             // Single-word triggers: require word boundary
             const regex = new RegExp(`\\b${trigger.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+            return regex.test(message);
+        });
+
+        if (hasTrigger) matched.push(skill);
+    }
+
+    return matched;
+}')}\\b`, 'i');
             return regex.test(message);
         });
 

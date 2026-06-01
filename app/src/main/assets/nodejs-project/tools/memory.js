@@ -111,36 +111,40 @@ const tools = [
 ];
 
 const handlers = {
-    async memory_save(input, chatId) {
+    async memory_save(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
         // DeerFlow P1: Scrub session-specific content before persisting
         const scrubbed = scrubSessionContent(redactSecrets(input.content));
         if (!scrubbed) {
             return { success: true, message: 'Content was entirely session-specific and was not saved. Only save durable facts, preferences, and important details.' };
         }
-        const currentMemory = loadMemory();
+        const currentMemory = loadMemory(baseDir);
         const newMemory = currentMemory + '\n\n---\n\n' + scrubbed;
-        saveMemory(newMemory.trim());
+        saveMemory(newMemory.trim(), baseDir);
         return { success: true, message: 'Memory saved' };
     },
 
-    async memory_read(input, chatId) {
-        const memory = loadMemory();
+    async memory_read(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
+        const memory = loadMemory(baseDir);
         return { content: memory || '(Memory is empty)' };
     },
 
-    async daily_note(input, chatId) {
+    async daily_note(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
         // DeerFlow P1: Scrub session-specific content before persisting
         const scrubbed = scrubSessionContent(redactSecrets(input.note));
         if (!scrubbed) {
             return { success: true, message: 'Note was entirely session-specific and was not saved. Only save durable facts and observations.' };
         }
-        appendDailyMemory(scrubbed);
+        appendDailyMemory(scrubbed, baseDir);
         return { success: true, message: 'Note added to daily memory' };
     },
 
-    async memory_search(input, chatId) {
+    async memory_search(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
         const maxResults = input.max_results || 10;
-        const results = searchMemory(input.query, maxResults);
+        const results = searchMemory(input.query, maxResults, baseDir);
         return {
             query: input.query,
             count: results.length,
@@ -148,8 +152,9 @@ const handlers = {
         };
     },
 
-    async memory_get(input, chatId) {
-        const filePath = safePath(input.file);
+    async memory_get(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
+        const filePath = safePath(input.file, baseDir);
         if (!filePath) return { error: 'Access denied: path outside workspace' };
         if (!fs.existsSync(filePath)) {
             return { error: `File not found: ${input.file}` };
@@ -167,7 +172,8 @@ const handlers = {
         };
     },
 
-    async memory_stats(input, chatId) {
+    async memory_stats(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
         const stats = {
             memoryMd: { exists: false, size: 0 },
             dailyFiles: { count: 0, totalSize: 0, oldestDate: null, newestDate: null },
@@ -175,7 +181,7 @@ const handlers = {
         };
 
         // Check MEMORY.md
-        const memoryPath = path.join(workDir, 'MEMORY.md');
+        const memoryPath = path.join(baseDir, 'MEMORY.md');
         if (fs.existsSync(memoryPath)) {
             const stat = fs.statSync(memoryPath);
             stats.memoryMd.exists = true;
@@ -189,7 +195,7 @@ const handlers = {
         }
 
         // Check daily memory files
-        const memoryDir = path.join(workDir, 'memory');
+        const memoryDir = path.join(baseDir, 'memory');
         if (fs.existsSync(memoryDir)) {
             const files = fs.readdirSync(memoryDir).filter(f => f.endsWith('.md')).sort();
             stats.dailyFiles.count = files.length;

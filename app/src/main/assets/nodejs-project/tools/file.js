@@ -119,8 +119,9 @@ const tools = [
 ];
 
 const handlers = {
-    async read(input, chatId) {
-        const filePath = safePath(input.path);
+    async read(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
+        const filePath = safePath(input.path, baseDir);
         if (!filePath) return { error: 'Access denied: path outside workspace' };
         // Check basename first, then resolve symlinks to catch aliased access
         const readBasename = path.basename(filePath);
@@ -151,14 +152,15 @@ const handlers = {
         };
     },
 
-    async write(input, chatId) {
-        const filePath = safePath(input.path);
+    async write(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
+        const filePath = safePath(input.path, baseDir);
         if (!filePath) return { error: 'Access denied: path outside workspace' };
 
         // Skill file write protection: writes to skills/ directory are blocked
         // when suspicious injection patterns are detected in the content (defense
         // against prompt injection creating persistent backdoor skills).
-        const relPath = path.relative(workDir, filePath);
+        const relPath = path.relative(baseDir, filePath);
         const relPathLower = relPath.toLowerCase();
         if (relPathLower.startsWith('skills' + path.sep) || relPathLower.startsWith('skills/')) {
             // Check for suspicious content in the skill being written
@@ -178,7 +180,7 @@ const handlers = {
         fs.writeFileSync(filePath, input.content, 'utf8');
 
         // BAT-236: If agent wrote to workspace root agent_settings.json, re-sync API keys
-        if (filePath === path.join(workDir, 'agent_settings.json')) {
+        if (filePath === path.join(baseDir, 'agent_settings.json')) {
             syncAgentApiKeys();
             rebuildRedactPatterns();
         }
@@ -190,8 +192,9 @@ const handlers = {
         };
     },
 
-    async edit(input, chatId) {
-        const filePath = safePath(input.path);
+    async edit(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
+        const filePath = safePath(input.path, baseDir);
         if (!filePath) return { error: 'Access denied: path outside workspace' };
         if (!fs.existsSync(filePath)) {
             return { error: `File not found: ${input.path}` };
@@ -219,7 +222,7 @@ const handlers = {
         }
 
         // Skill file edit protection (same as write tool)
-        const editRelPath = path.relative(workDir, filePath).toLowerCase();
+        const editRelPath = path.relative(baseDir, filePath).toLowerCase();
         if (editRelPath.startsWith('skills' + path.sep) || editRelPath.startsWith('skills/')) {
             const suspicious = detectSuspiciousPatterns(content);
             if (suspicious.length > 0) {
@@ -231,7 +234,7 @@ const handlers = {
         fs.writeFileSync(filePath, content, 'utf8');
 
         // BAT-236: If agent edited workspace root agent_settings.json, re-sync API keys
-        if (filePath === path.join(workDir, 'agent_settings.json')) {
+        if (filePath === path.join(baseDir, 'agent_settings.json')) {
             syncAgentApiKeys();
             rebuildRedactPatterns();
         }
@@ -243,8 +246,9 @@ const handlers = {
         };
     },
 
-    async ls(input, chatId) {
-        const targetPath = safePath(input.path || '');
+    async ls(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
+        const targetPath = safePath(input.path || '', baseDir);
         if (!targetPath) return { error: 'Access denied: path outside workspace' };
         if (!fs.existsSync(targetPath)) {
             return { error: `Directory not found: ${input.path || '/'}` };
@@ -279,7 +283,8 @@ const handlers = {
         };
     },
 
-    async delete(input, chatId) {
+    async delete(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
         // Core identity files + secrets (uses shared SECRETS_BLOCKED for the latter)
         const DELETE_PROTECTED = new Set([
             'SOUL.md', 'MEMORY.md', 'IDENTITY.md', 'USER.md', 'HEARTBEAT.md',
@@ -287,11 +292,11 @@ const handlers = {
         ]);
 
         if (!input.path) return { error: 'path is required' };
-        const filePath = safePath(input.path);
+        const filePath = safePath(input.path, baseDir);
         if (!filePath) return { error: 'Access denied: path outside workspace' };
 
         // Check against protected files (compare basename for top-level, full relative for nested)
-        const relativePath = path.relative(workDir, filePath);
+        const relativePath = path.relative(baseDir, filePath);
         const baseName = path.basename(filePath);
         if (DELETE_PROTECTED.has(relativePath) || DELETE_PROTECTED.has(baseName)) {
             return { error: `Cannot delete protected file: ${baseName}` };
@@ -312,7 +317,7 @@ const handlers = {
             // Auto-clean empty parent directory inside skills/
             let directoryRemoved = false;
             const parentDir = path.dirname(filePath);
-            const relParent = path.relative(workDir, parentDir);
+            const relParent = path.relative(baseDir, parentDir);
             const parentParts = relParent.split('/');
             if (parentParts[0] === 'skills' && parentParts.length === 2) {
                 try {
@@ -334,11 +339,12 @@ const handlers = {
         }
     },
 
-    async send_file(input, chatId) {
+    async send_file(input, chatId, options = {}) {
+        const baseDir = options.overrideWorkDir || workDir;
         if (!input.path) return { error: 'path is required' };
         if (!input.chat_id) return { error: 'chat_id is required' };
 
-        const filePath = safePath(input.path);
+        const filePath = safePath(input.path, baseDir);
         if (!filePath) return { error: 'Access denied: path outside workspace' };
         if (!fs.existsSync(filePath)) return { error: `File not found: ${input.path}` };
 
