@@ -17,6 +17,7 @@ const solanaMod   = require('./solana');
 const telegramMod = CHANNEL === 'telegram' ? require('./telegram') : null;
 const systemMod   = require('./system');
 const envMod      = require('./env');
+const agentMod    = require('./agent');
 
 // ── Merged TOOLS array ───────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ const TOOLS = [
     ...(telegramMod ? telegramMod.tools : []),
     ...systemMod.tools,
     ...envMod.tools,
+    ...agentMod.AGENT_TOOLS,
 ];
 
 // ── Handler dispatch map ─────────────────────────────────────────────────────
@@ -48,6 +50,12 @@ const handlerMap = Object.assign({},
     ...(telegramMod ? [telegramMod.handlers] : []),
     systemMod.handlers,
     envMod.handlers,
+    {
+        agent_create: (args, chatId) => agentMod.handleAgentTool('agent_create', args, chatId),
+        agent_list: (args, chatId) => agentMod.handleAgentTool('agent_list', args, chatId),
+        agent_spawn: (args, chatId) => agentMod.handleAgentTool('agent_spawn', args, chatId),
+        agent_delete: (args, chatId) => agentMod.handleAgentTool('agent_delete', args, chatId),
+    }
 );
 
 // ── Shared state ─────────────────────────────────────────────────────────────

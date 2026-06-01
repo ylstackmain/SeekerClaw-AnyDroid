@@ -45,20 +45,27 @@ object MarketplaceRepository {
             if (status !in 200..299) {
                 return@runCatching emptyList()
             }
-            val responseObj = JSONObject(body)
-            // Handle various response shapes
-            val arr = when {
-                responseObj.has("items") -> responseObj.getJSONArray("items")
-                responseObj.has("skills") -> responseObj.getJSONArray("skills")
-                responseObj.has("data") -> {
-                    val data = responseObj.get("data")
-                    if (data is JSONArray) data
-                    else if (data is JSONObject && data.has("items")) data.getJSONArray("items")
-                    else if (data is JSONObject && data.has("skills")) data.getJSONArray("skills")
-                    else JSONArray()
+            
+            // Handle both JSONArray and JSONObject response shapes
+            val responseText = body.trim()
+            val arr = if (responseText.startsWith("[")) {
+                JSONArray(responseText)
+            } else {
+                val responseObj = JSONObject(responseText)
+                when {
+                    responseObj.has("items") -> responseObj.getJSONArray("items")
+                    responseObj.has("skills") -> responseObj.getJSONArray("skills")
+                    responseObj.has("data") -> {
+                        val data = responseObj.get("data")
+                        if (data is JSONArray) data
+                        else if (data is JSONObject && data.has("items")) data.getJSONArray("items")
+                        else if (data is JSONObject && data.has("skills")) data.getJSONArray("skills")
+                        else JSONArray()
+                    }
+                    else -> JSONArray()
                 }
-                else -> JSONArray()
             }
+            
             val skills = mutableListOf<MarketplaceSkill>()
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)

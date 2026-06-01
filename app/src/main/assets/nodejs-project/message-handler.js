@@ -8,6 +8,7 @@ const { CHANNEL, workDir, PROVIDER, AUTH_TYPE, OPENAI_AUTH_TYPE, resolveActiveMo
 const { stripSilentReply, containsSilentReply } = require('./silent-reply');
 const modelCatalog = require('./model-catalog');
 const { buildHelpLines } = require('./telegram-commands');
+const agentManager = require('./agent-manager');
 
 let deps = {};
 let initialized = false;
@@ -139,6 +140,11 @@ Send me anything to get started!`;
             deps.clearConversation(chatId);
             deps.sessionTracking.delete(chatId);
             return 'Session archived. Conversation reset.';
+        }
+
+        case '/agents': {
+            const agents = await agentManager.listAgents();
+            return `**Available Agent Profiles**\n\n- ${agents.join('\n- ')}\n\nUse \`agent_create\` tool to add more.`;
         }
 
         case '/soul': {

@@ -35,6 +35,7 @@ const COMMAND_REGISTRY = [
     { name: 'reset',    description: 'Wipe conversation (no backup)' },
     { name: 'resume',   description: 'Resume an interrupted task' },
     { name: 'skill',    description: 'List skills or run one by name', fallback: true },
+    { name: 'agents',   description: 'List all available agent profiles' },
     { name: 'soul',     description: 'View SOUL.md' },
     { name: 'memory',   description: 'View MEMORY.md' },
     { name: 'logs',     description: 'Last 10 log entries' },

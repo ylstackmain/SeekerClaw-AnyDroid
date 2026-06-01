@@ -893,6 +893,9 @@ telegram('getMe')
         setMcpExecuteTool((name, input) => mcpManager.executeTool(name, input));
         setFullToolRegistry(() => [...TOOLS, ...mcpManager.getAllTools()]);
 
+        // Inject chat function into agent tools for spawning
+        require('./tools/agent').setChatFn(chat);
+
         startDbSummaryInterval();
         // BAT-514: see Telegram path comment above.
         internalControlServer.start({

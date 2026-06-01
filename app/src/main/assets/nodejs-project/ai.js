@@ -512,16 +512,32 @@ async function saveSessionSummary(chatId, trigger, { force = false, skipIndex = 
 // SYSTEM PROMPT
 // ============================================================================
 
-function buildSystemBlocks(matchedSkills = [], chatId = null, activeModel = MODEL) {
-    const soul = loadSoul();
-    const memory = loadMemory();
-    const dailyMemory = loadDailyMemory();
+function buildSystemBlocks(matchedSkills = [], chatId = null, activeModel = MODEL, options = {}) {
+    const { overrideWorkDir = workDir, isSubAgent = false, agentName = null } = options;
+
+    const loadLocal = (file) => {
+        const p = path.join(overrideWorkDir, file);
+        try { return fs.existsSync(p) ? fs.readFileSync(p, "utf8") : ""; } catch (_) { return ""; }
+    };
+    const soul = loadLocal("SOUL.md");
+    const memory = loadLocal("MEMORY.md");
+    const dailyMemory = isSubAgent ? "" : loadDailyMemory();
     const allSkills = loadSkills();
-    const bootstrap = loadBootstrap();
-    const identity = loadIdentity();
-    const user = loadUser();
+    const bootstrap = loadLocal("BOOTSTRAP.md");
+    const identity = loadLocal("IDENTITY.md");
+    const user = isSubAgent ? "" : loadUser();
 
     const lines = [];
+
+    // SUB-AGENT MODE (NEW)
+    if (isSubAgent) {
+        lines.push("# SUB-AGENT EXECUTION");
+        lines.push(`You are a specialized sub-agent named "${agentName || "Sub"}" spawned by a Lead Agent.`);
+        lines.push("Complete the specific task assigned to you as efficiently as possible.");
+        lines.push("Your output will be returned to the Lead Agent, not directly to the human user.");
+        lines.push("Focus exclusively on your persona defined in SOUL.md and the task at hand.");
+        lines.push("");
+    }
     const isCronSession = typeof chatId === 'string' && chatId.startsWith('cron:');
 
     // CRON SESSION MODE (BAT-326) — inject task execution context
@@ -591,6 +607,14 @@ function buildSystemBlocks(matchedSkills = [], chatId = null, activeModel = MODE
 
     // Tooling section - tool schemas are provided via the tools API array;
     // only behavioral guidance here to avoid duplicating ~1,500 tokens of tool descriptions
+## Multi-Agent Orchestration
+You are a Lead Agent capable of managing a team of specialized sub-agents.
+- **agent_create**: Create a new agent profile with a specific SOUL.md personality.
+- **agent_list**: List all currently available agent profiles.
+- **agent_spawn**: Delegate a task to a sub-agent. This is an isolated session where the sub-agent will use its own personality and tools to complete the task and return the result to you.
+- **agent_delete**: Remove an agent profile.
+Use sub-agents for specialized tasks (e.g., deep research, data processing, security audits) to keep your main conversation context clean and efficient.
+
     lines.push('## Tooling');
     lines.push('Tools are provided via the tools API. Call tools exactly as listed by name.');
     lines.push('For visual checks ("what do you see", "check my dog"), call android_camera_check.');
@@ -2188,7 +2212,7 @@ async function chat(chatId, userMessage, options = {}) {
     // name out of its own system prompt.
     const activeModel = resolveActiveModel();
 
-    const { stable: stablePrompt, dynamic: dynamicPrompt } = buildSystemBlocks(matchedSkills, chatId, activeModel);
+    const { stable: stablePrompt, dynamic: dynamicPrompt } = buildSystemBlocks(matchedSkills, chatId, activeModel, options);
 
     // P2.4: Resume directive — injected as a high-priority system block so Claude
     // cannot ignore it. User messages are suggestions; system directives are orders.

@@ -176,6 +176,7 @@ class AndroidBridge(
                 "/config/credentials" -> handleConfigCredentials()
                 "/config/mcp-token" -> handleConfigMcpToken(params)
                 "/service/restart" -> handleServiceRestart()
+                "/agents/list" -> handleAgentsList()
                 "/stats/db-summary" -> proxyToNodeStats()
                 "/ping" -> jsonResponse(200, mapOf("status" to "ok", "bridge" to "AndroidBridge"))
                 else -> jsonResponse(404, mapOf("error" to "Unknown endpoint: $uri"))

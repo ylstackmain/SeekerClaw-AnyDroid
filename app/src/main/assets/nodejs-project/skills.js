@@ -411,18 +411,20 @@ function isPathInside(childPath, parentPath) {
 
 let _firstLoadLogged = false;
 
-function loadSkills() {
+function loadSkills(overrideWorkDir = null) {
     const skills = [];
     const isFirstLoad = !_firstLoadLogged;
 
-    if (!fs.existsSync(SKILLS_DIR)) {
+    const baseDir = overrideWorkDir ? path.join(overrideWorkDir, 'skills') : SKILLS_DIR;
+
+    if (!fs.existsSync(baseDir)) {
         return skills;
     }
 
-    // Resolve SKILLS_DIR realpath for symlink escape protection
+    // Resolve baseDir realpath for symlink escape protection
     let realSkillsDir;
     try {
-        realSkillsDir = fs.realpathSync(SKILLS_DIR);
+        realSkillsDir = fs.realpathSync(baseDir);
     } catch (e) {
         log(`[Skills] Cannot resolve skills directory: ${e.message}`, 'ERROR');
         return skills;
@@ -431,11 +433,11 @@ function loadSkills() {
     let dirCount = 0, fileCount = 0;
 
     try {
-        const entries = fs.readdirSync(SKILLS_DIR, { withFileTypes: true });
+        const entries = fs.readdirSync(baseDir, { withFileTypes: true });
 
         for (const entry of entries) {
             // Symlinks report isSymbolicLink()=true but isDirectory()/isFile()=false in Node 18 Dirent
-            const entryPath = path.join(SKILLS_DIR, entry.name);
+            const entryPath = path.join(baseDir, entry.name);
             let isDir = entry.isDirectory();
             let isFile = entry.isFile();
             if (entry.isSymbolicLink()) {
