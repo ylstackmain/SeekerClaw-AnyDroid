@@ -229,63 +229,78 @@ const handlers = {
 
     async skill_marketplace_search(input) {
         const { query } = input;
-        // Android-side ConfigManager now manages multiple skill source URLs.
-        // This is the default ClawHub catalog; users can add/remove sources in Settings.
-        const baseUrl = 'https://api.clawhub.ai/v1';
-        const url = (!query || query.trim() === '')
-            ? `${baseUrl}/skills?limit=50&sort=createdAt`
-            : `${baseUrl}/skills?q=${encodeURIComponent(query)}`;
         
-        try {
-            const res = await webFetch(url, { timeout: 15000 });
-            if (res.status !== 200) {
-                return { error: `Marketplace search failed: HTTP ${res.status}` };
-            }
+        // Android-side ConfigManager now manages multiple skill source URLs.
+        // Falls back to ClawHub if skillSources is missing from config.json (BAT-199).
+        const sources = (config.skillSources && Array.isArray(config.skillSources))
+            ? config.skillSources.filter(s => s.enabled)
+            : [{ name: 'ClawHub', url: 'https://api.clawhub.ai/v1' }];
+
+        if (sources.length === 0) {
+            return { count: 0, skills: [], note: 'No skill sources enabled in Settings.' };
+        }
+
+        const results = await Promise.all(sources.map(async (source) => {
+            const baseUrl = source.url.replace(/\/+$/, '');
+            const url = (!query || query.trim() === '')
+                ? `${baseUrl}/skills?limit=50&sort=createdAt`
+                : `${baseUrl}/skills?q=${encodeURIComponent(query)}`;
             
-            const rawData = res.data;
-            
-            // Handle various response shapes:
-            // 1. Direct array: [ {...}, {...} ]
-            // 2. Wrapped with "items": { items: [...] }
-            // 3. Wrapped with "skills": { skills: [...] }
-            // 4. Wrapped with "data": { data: [...] } or { data: { items: [...] } }
-            let skills = [];
-            if (Array.isArray(rawData)) {
-                skills = rawData;
-            } else if (rawData && typeof rawData === 'object') {
-                if (rawData.items) {
-                    skills = Array.isArray(rawData.items) ? rawData.items : [];
-                } else if (rawData.skills) {
-                    skills = Array.isArray(rawData.skills) ? rawData.skills : [];
-                } else if (rawData.data) {
-                    const inner = rawData.data;
-                    if (Array.isArray(inner)) {
-                        skills = inner;
-                    } else if (typeof inner === 'object') {
-                        skills = inner.items || inner.skills || [];
+            try {
+                const res = await webFetch(url, { timeout: 10000 });
+                if (res.status !== 200) {
+                    log(`Marketplace search failed for ${source.name}: HTTP ${res.status}`, 'WARN');
+                    return [];
+                }
+                
+                const rawData = res.data;
+                let skills = [];
+                if (Array.isArray(rawData)) {
+                    skills = rawData;
+                } else if (rawData && typeof rawData === 'object') {
+                    if (rawData.items) {
+                        skills = Array.isArray(rawData.items) ? rawData.items : [];
+                    } else if (rawData.skills) {
+                        skills = Array.isArray(rawData.skills) ? rawData.skills : [];
+                    } else if (rawData.data) {
+                        const inner = rawData.data;
+                        if (Array.isArray(inner)) {
+                            skills = inner;
+                        } else if (typeof inner === 'object') {
+                            skills = inner.items || inner.skills || [];
+                        }
                     }
                 }
-            }
-            
-            return {
-                count: skills.length,
-                skills: skills.map(s => ({
+                
+                return skills.map(s => ({
                     id: s.slug || s.id || '',
                     name: s.displayName || s.name || '',
                     description: s.summary || s.description || '',
                     author: typeof s.author === 'object' ? s.author.name : s.author || '',
                     version: s.latestVersion?.version || s.version || "1.0.0",
                     downloadUrl: s.download?.url || s.downloadUrl || s.download || '',
-                    source: 'ClawHub',
+                    source: source.name,
                     emoji: s.emoji || '🧩',
                     imageUrl: typeof s.image === 'object' ? s.image.url : s.image || '',
                     triggers: Array.isArray(s.triggers) ? s.triggers : [],
                     requiresEnv: Array.isArray(s.requiresEnv) ? s.requiresEnv : [],
-                }))
-            };
-        } catch (e) {
-            return { error: `Marketplace search failed: ${e.message}` };
-        }
+                }));
+            } catch (e) {
+                log(`Marketplace search failed for ${source.name}: ${e.message}`, 'WARN');
+                return [];
+            }
+        }));
+
+        const allSkills = results.flat();
+        
+        // Deduplicate by ID/name? Probably not needed if we want to show which source they come from.
+        // But let's sort by name for better UX.
+        allSkills.sort((a, b) => a.name.localeCompare(b.name));
+
+        return {
+            count: allSkills.length,
+            skills: allSkills
+        };
     },
 };
 

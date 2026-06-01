@@ -1844,6 +1844,18 @@ object ConfigManager {
                 }
                 put("envVars", envObj)
             }
+            val skillSources = loadSkillSources(context)
+            if (skillSources.isNotEmpty()) {
+                val arr = JSONArray()
+                for (s in skillSources) {
+                    arr.put(JSONObject().apply {
+                        put("name", s.name)
+                        put("url", s.url)
+                        put("enabled", s.enabled)
+                    })
+                }
+                put("skillSources", arr)
+            }
             val mcpServers = loadMcpServers(context)
             if (mcpServers.isNotEmpty()) {
                 val arr = JSONArray()
@@ -3300,6 +3312,18 @@ object ConfigManager {
         json.put("heartbeatIntervalMinutes", config.heartbeatIntervalMinutes)
         json.put("maxStepsPerTurn", config.maxStepsPerTurn)
         json.put("autoStartOnBoot", config.autoStartOnBoot)
+            val skillSources = loadSkillSources(context)
+            if (skillSources.isNotEmpty()) {
+                val arr = JSONArray()
+                for (s in skillSources) {
+                    arr.put(JSONObject().apply {
+                        put("name", s.name)
+                        put("url", s.url)
+                        put("enabled", s.enabled)
+                    })
+                }
+                put("skillSources", arr)
+            }
         val mcpServers = loadMcpServers(context)
         if (mcpServers.isNotEmpty()) {
             val arr = JSONArray()
